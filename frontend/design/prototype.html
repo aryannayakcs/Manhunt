@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manhunt Design Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* base */
+  --bg:#000; --s1:#0b0d0e; --s2:#14181a; --s3:#1d2326; --line:#262d30;
+  --tx:#e9eef0; --tx2:#8a979c; --tx3:#556165;
+  /* roles */
+  --chaser:#ff5a2c; --chaser-d:#3a130a;
+  --runner:#1fe3b4; --runner-d:#06312a;
+  /* alerts */
+  --info:#5aa9ff; --warn:#ffb020; --danger:#ff2d4f; --danger-d:#3a0712;
+  /* player colors (distinct on dark map) */
+  --p1:#ff5a2c;--p2:#ffd23f;--p3:#1fe3b4;--p4:#5aa9ff;--p5:#b57bff;--p6:#ff6ec7;--p7:#9be15d;--p8:#ff9f1c;--p9:#3dd6f5;--p10:#f2f2f2;
+  --disp:'Barlow Condensed','Arial Narrow',Impact,sans-serif;
+  --ui:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+body{background:#0a0a0b;color:var(--tx);font:15px/1.4 var(--ui);min-height:100vh}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:230px 1fr 270px;gap:24px;max-width:1100px;margin:0 auto;padding:20px}
+nav{position:sticky;top:20px;align-self:start;max-height:calc(100vh - 40px);overflow:auto}
+nav h1{font:800 28px var(--disp);letter-spacing:.08em;margin-bottom:2px}
+nav small{color:var(--tx2);display:block;margin-bottom:14px}
+nav h4{font:600 11px var(--ui);letter-spacing:.12em;color:var(--tx3);text-transform:uppercase;margin:14px 0 4px}
+nav button{display:block;width:100%;text-align:left;padding:6px 10px;border-radius:8px;color:var(--tx2);font-size:13px}
+nav button:hover{background:var(--s2)}
+nav button.on{background:var(--s3);color:var(--tx)}
+aside{position:sticky;top:20px;align-self:start;font-size:13px;color:var(--tx2)}
+aside h3{color:var(--tx);font:600 13px var(--ui);margin:0 0 6px;letter-spacing:.04em}
+aside p{margin-bottom:14px}
+aside label{display:flex;gap:8px;align-items:center;margin:6px 0;color:var(--tx)}
+aside input[type=range]{width:100%}
+.stage{display:flex;justify-content:center}
+.phone{width:390px;height:844px;background:var(--bg);border-radius:44px;border:10px solid #1b1d1f;position:relative;overflow:hidden;box-shadow:0 30px 80px #000a}
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#1b1d1f;border-radius:0 0 18px 18px;z-index:50}
+.scr{position:absolute;inset:0;padding:44px 20px 28px;display:flex;flex-direction:column;gap:14px;overflow:hidden}
+.scr.scroll{overflow-y:auto}
+.scr.runner{--accent:var(--runner)}
+.scr.chaser{--accent:var(--chaser)}
+.scr.neutral{--accent:var(--tx)}
+/* stealth: dims everything for runners */
+body.stealth .scr.runner{filter:brightness(.55) saturate(.8)}
+/* ---------- type ---------- */
+.disp{font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.03em;line-height:.95}
+.timer{font:800 84px var(--mono);letter-spacing:-.04em;line-height:1;text-align:center}
+.timer.sm{font-size:30px}
+.timer.red{color:var(--danger)}
+.lbl{font:600 11px var(--ui);letter-spacing:.14em;text-transform:uppercase;color:var(--tx2)}
+.mut{color:var(--tx2)}
+.center{text-align:center}
+.grow{flex:1}
+.row{display:flex;gap:10px;align-items:center}
+/* ---------- controls ---------- */
+.btn{min-height:60px;border-radius:18px;font:800 22px var(--disp);letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:var(--s3);color:var(--tx);border:1px solid var(--line)}
+.btn.pri{background:var(--accent,var(--chaser));color:#000;border-color:transparent}
+.btn.chaser{background:var(--chaser);color:#000;border:0}
+.btn.runner{background:var(--runner);color:#000;border:0}
+.btn.danger{background:var(--danger);color:#fff;border:0}
+.btn.ghost{background:transparent}
+.btn.sm{min-height:56px;font-size:18px}
+.btn[disabled]{opacity:.35}
+.hint{font-size:12px;color:var(--tx2);text-align:center}
+.card{background:var(--s1);border:1px solid var(--line);border-radius:18px;padding:14px}
+.seg{display:flex;background:var(--s2);border-radius:14px;padding:4px;gap:4px}
+.seg button{flex:1;min-height:48px;border-radius:11px;font-weight:600;color:var(--tx2)}
+.seg button.on{background:var(--s3);color:var(--tx);box-shadow:inset 0 0 0 1px var(--line)}
+.switch{width:56px;height:32px;border-radius:16px;background:var(--s3);position:relative;flex:none}
+.switch::after{content:"";position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:var(--tx2);transition:.15s}
+.switch.on{background:var(--runner-d);box-shadow:inset 0 0 0 1px var(--runner)}
+.switch.on::after{left:28px;background:var(--runner)}
+.step{display:flex;align-items:center;gap:12px}
+.step b{width:56px;height:56px;border-radius:16px;background:var(--s3);display:grid;place-items:center;font:800 28px var(--disp)}
+.step span{font:800 32px var(--mono);min-width:36px;text-align:center}
+.slider{height:8px;background:var(--s3);border-radius:4px;position:relative;margin:14px 0 6px}
+.slider i{position:absolute;left:0;top:0;bottom:0;background:var(--runner);border-radius:4px}
+.slider u{position:absolute;top:-10px;width:28px;height:28px;border-radius:50%;background:var(--tx);margin-left:-14px;box-shadow:0 0 0 4px #000}
+.setrow{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:52px}
+.setrow+.setrow{border-top:1px solid var(--line)}
+.setrow .v{font:700 16px var(--mono);color:var(--runner)}
+/* code input */
+.code{display:flex;gap:10px;justify-content:center}
+.code span{width:68px;height:88px;border-radius:16px;background:var(--s2);border:2px solid var(--line);display:grid;place-items:center;font:800 54px var(--mono)}
+.code span.on{border-color:var(--runner)}
+.code.big span{width:76px;height:96px;font-size:60px;border-color:var(--runner);color:var(--runner);background:var(--runner-d)}
+/* avatars */
+.av{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:22px;flex:none;background:var(--c,#444);color:#000;font-weight:800;position:relative}
+.av.lg{width:96px;height:96px;font-size:50px}
+.av.sm{width:32px;height:32px;font-size:16px}
+.crown{position:absolute;top:-8px;right:-6px;font-size:14px}
+.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.swatches i{aspect-ratio:1;border-radius:14px;background:var(--c);display:block}
+.swatches i.on{box-shadow:0 0 0 3px #000,0 0 0 6px #fff}
+.avs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.avs i{aspect-ratio:1;border-radius:12px;background:var(--s2);display:grid;place-items:center;font-size:24px;font-style:normal}
+.avs i.on{outline:2px solid var(--runner)}
+.player{display:flex;gap:12px;align-items:center;min-height:60px;padding:8px 12px;background:var(--s1);border:1px solid var(--line);border-radius:16px}
+.player.off{opacity:.4}
+.tag{font:700 11px var(--ui);letter-spacing:.1em;padding:4px 8px;border-radius:8px;text-transform:uppercase}
+.tag.c{background:var(--chaser-d);color:var(--chaser)}
+.tag.r{background:var(--runner-d);color:var(--runner)}
+.tag.j{background:#3a2c07;color:var(--warn)}
+.tag.o{background:var(--s3);color:var(--tx2)}
+/* top bar */
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pill{background:var(--s2);border:1px solid var(--line);border-radius:14px;padding:6px 12px;font:700 14px var(--mono);display:flex;gap:6px;align-items:center}
+.pill small{font:600 10px var(--ui);color:var(--tx2);letter-spacing:.1em;text-transform:uppercase}
+/* map */
+.map{position:relative;flex:1;border-radius:22px;overflow:hidden;background:#06090a;border:1px solid var(--line);min-height:0}
+.map svg{width:100%;height:100%;display:block}
+/* heartbeat vignette */
+.vig{position:absolute;inset:0;pointer-events:none;z-index:20;border-radius:34px}
+.vig.l1{box-shadow:inset 0 0 70px 6px #ff2d4f33;animation:beat 1.4s infinite}
+.vig.l2{box-shadow:inset 0 0 90px 14px #ff2d4f77;animation:beat .9s infinite}
+.vig.l3{box-shadow:inset 0 0 120px 30px #ff2d4fcc;animation:beat .5s infinite}
+@keyframes beat{0%,100%{opacity:.35}30%{opacity:1}55%{opacity:.5}}
+.reduce .vig,.reduce *{animation:none!important}
+@media (prefers-reduced-motion:reduce){.vig,.scr *{animation:none!important}}
+/* heart meter */
+.heart{display:flex;gap:8px;align-items:center;justify-content:center}
+.heart i{width:54px;height:14px;border-radius:7px;background:var(--s3)}
+.heart i.on1{background:var(--warn)}.heart i.on2{background:#ff7a2c}.heart i.on3{background:var(--danger)}
+/* takeover */
+.take{position:absolute;inset:0;z-index:30;padding:60px 24px 32px;display:flex;flex-direction:column;gap:16px;justify-content:center;text-align:center}
+.take.red{background:var(--danger-d)}
+.take.chaser{background:var(--chaser-d)}
+.take.runner{background:var(--runner-d)}
+.take .big{font:800 64px var(--disp);text-transform:uppercase;line-height:.95}
+.pulse{animation:pls 1.2s infinite}
+@keyframes pls{50%{opacity:.55}}
+/* toast/banner */
+.toast{background:var(--s3);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:14px}
+.banner{border-radius:14px;padding:12px 14px;font-weight:700;display:flex;gap:10px;align-items:center}
+.banner.warn{background:#3a2c07;color:var(--warn)}
+.banner.danger{background:var(--danger-d);color:var(--danger)}
+.banner.info{background:#0a2238;color:var(--info)}
+.sys{display:grid;gap:14px}
+.sys h2{font:800 22px var(--disp);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:4px}
+.pal{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;font-size:10px;color:var(--tx2)}
+.pal div i{display:block;height:34px;border-radius:8px;margin-bottom:3px}
+.award{background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:4px}
+.award b{font:800 22px var(--mono)}
+.ring{width:130px;height:130px;border-radius:50%;margin:0 auto;display:grid;place-items:center;background:conic-gradient(var(--runner) 216deg,var(--s3) 0);position:relative}
+.ring::before{content:"";position:absolute;inset:10px;border-radius:50%;background:var(--bg)}
+.ring b{position:relative;font:800 34px var(--mono)}
+.badge{display:inline-flex;gap:6px;background:var(--runner-d);color:var(--runner);border:1px solid var(--runner);border-radius:20px;padding:4px 12px;font-weight:700;font-size:13px}
+@media(max-width:900px){.shell{grid-template-columns:1fr;padding:10px}nav,aside{position:static;max-height:none}nav{display:flex;flex-wrap:wrap;gap:4px}nav h4,nav small{width:100%}nav button{width:auto}.phone{width:100%;max-width:390px}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav id="nav"></nav>
+  <div class="stage"><div class="phone" id="phone"><div class="notch"></div><div id="view"></div></div></div>
+  <aside>
+    <h3>Controls</h3>
+    <p>Click screens at left. This is a design prototype, not the app.</p>
+    <label><input type="checkbox" id="stealth"> Stealth dim (runner screens)</label>
+    <label><input type="checkbox" id="reduce"> Reduced motion fallback</label>
+    <div id="hbctl" style="display:none">
+      <h3 style="margin-top:14px">Heartbeat level</h3>
+      <input type="range" id="hb" min="0" max="3" value="2">
+      <p id="hbtxt"></p>
+    </div>
+    <h3 style="margin-top:14px">Design notes</h3>
+    <p id="notes"></p>
+  </aside>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const PC=['--p1','--p2','--p3','--p4','--p5','--p6','--p7','--p8','--p9','--p10'];
+const col=i=>`var(${PC[i%PC.length]})`;
+const av=(i,e,cls='',crown=false)=>`<div class="av ${cls}" style="--c:${col(i)}">${e}${crown?'<span class="crown">👑</span>':''}</div>`;
+const players=[['Ava','🦊',2,'r','free'],['Sam','🐺',0,'c','free'],['Ben','🦉',3,'r','free'],['Cleo','🐙',5,'r','jailed'],['Dev','🦈',4,'c','free'],['Mo','🐸',6,'r','out']];
+const tagOf=(r,s)=>s==='jailed'?'<span class="tag j">Jailed</span>':s==='out'?'<span class="tag o">Out</span>':r==='c'?'<span class="tag c">Chaser</span>':'<span class="tag r">Runner</span>';
+
+/* ---------- fake map ---------- */
+function map({zone=true,shrink=false,you=null,chasers=[],hints=[],jail=false,dim=false,exact=[]}={}){
+  const roads=[...Array(7)].map((_,i)=>`<line x1="${i*60}" y1="0" x2="${i*60+40}" y2="500" /><line x1="0" y1="${i*70}" x2="360" y2="${i*70-20}"/>`).join('');
+  return `<div class="map"><svg viewBox="0 0 360 500" preserveAspectRatio="xMidYMid slice">
+  <rect width="360" height="500" fill="#06090a"/>
+  <g stroke="${dim?'#101517':'#161d20'}" stroke-width="5" fill="none">${roads}</g>
+  <rect x="210" y="300" width="110" height="90" rx="14" fill="#0a1a12"/><rect x="30" y="60" width="90" height="70" rx="14" fill="#0a1a12"/>
+  ${zone?`<circle cx="180" cy="250" r="${shrink?150:165}" fill="none" stroke="${dim?'#8a979c':'#e9eef0'}" stroke-width="3" opacity=".85"/>`:''}
+  ${shrink?`<circle cx="180" cy="250" r="80" fill="none" stroke="#ffb020" stroke-width="2" stroke-dasharray="6 6"/>`:''}
+  ${jail?`<g transform="translate(110 340)"><circle r="22" fill="#ffb02022" stroke="#ffb020" stroke-width="2"/><text y="6" text-anchor="middle" font-size="18">⛓</text></g>`:''}
+  ${hints.map(([x,y,r,c,n,age,o])=>`<g opacity="${o??1}"><circle cx="${x}" cy="${y}" r="${r}" fill="${c}" fill-opacity=".16" stroke="${c}" stroke-width="2" stroke-dasharray="5 4"/><text x="${x}" y="${y+4}" text-anchor="middle" font-size="12" font-weight="700" fill="${c}">${n}</text><text x="${x}" y="${y+r+14}" text-anchor="middle" font-size="10" fill="#8a979c">${age}</text></g>`).join('')}
+  ${exact.map(([x,y,c,n,tag])=>`<g><circle cx="${x}" cy="${y}" r="9" fill="${c}" stroke="#000" stroke-width="3"/><circle cx="${x}" cy="${y}" r="16" fill="none" stroke="${c}" stroke-width="2"/><text x="${x}" y="${y-22}" text-anchor="middle" font-size="12" font-weight="700" fill="${c}">${n}</text><text x="${x}" y="${y+30}" text-anchor="middle" font-size="10" fill="#ff2d4f">${tag}</text></g>`).join('')}
+  ${chasers.map(([x,y,c,n])=>`<g><path d="M${x} ${y-10} l9 16 h-18 z" fill="${c}" stroke="#000" stroke-width="2"/><text x="${x}" y="${y+22}" text-anchor="middle" font-size="10" font-weight="700" fill="${c}">${n}</text></g>`).join('')}
+  ${you?`<g><circle cx="${you[0]}" cy="${you[1]}" r="22" fill="${you[2]}" opacity=".18"/><circle cx="${you[0]}" cy="${you[1]}" r="8" fill="${you[2]}" stroke="#fff" stroke-width="3"/></g>`:''}
+  </svg></div>`;
+}
+
+/* ---------- screens ---------- */
+const S={};
+let hbLevel=2;
+
+S.home={g:'Entry',t:'Home',n:'Dark, huge code boxes (no I or O), Create is primary. Deep link /join/ABCD pre-fills.',h:()=>`
+<div class="scr neutral">
+  <div class="grow" style="display:flex;flex-direction:column;justify-content:center;gap:10px">
+    <div class="lbl" style="color:var(--chaser)">● Real-life tag. After dark.</div>
+    <div class="disp" style="font-size:96px">Man<br>hunt</div>
+    <p class="mut" style="max-width:260px">Hide. Hunt. Your phone is the referee.</p>
+  </div>
+  <div class="lbl center">Join with a code</div>
+  <div class="code"><span>K</span><span>7</span><span class="on">F</span><span style="color:var(--tx3)">_</span></div>
+  <button class="btn runner">Join game</button>
+  <button class="btn">Create game</button>
+</div>`};
+
+S.wake={g:'Entry',t:'Home: states',n:'Wrong code, game full, server waking (free host takes up to ~1 min).',h:()=>`
+<div class="scr neutral">
+  <div class="grow" style="display:flex;flex-direction:column;justify-content:center;gap:16px;align-items:center;text-align:center">
+    <div class="ring" style="background:conic-gradient(var(--chaser) 120deg,var(--s3) 0)"><b>…</b></div>
+    <div class="disp" style="font-size:44px">Waking up<br>the server…</div>
+    <p class="mut">Free server naps when idle. Up to a minute on first connect.</p>
+  </div>
+  <div class="banner danger">No game with code KQZF</div>
+  <div class="banner warn">Game full (50 players)</div>
+</div>`};
+
+S.char={g:'Entry',t:'Character setup',n:'Name, 10 bold colors, avatar set. Saved on phone; editable in lobby.',h:()=>`
+<div class="scr neutral scroll">
+  <div class="disp" style="font-size:40px">Who are you?</div>
+  <div class="center">${av(2,'🦊','lg')}</div>
+  <div class="card" style="font:700 22px var(--ui)">Ava <span style="color:var(--runner)">|</span></div>
+  <div class="lbl">Color</div>
+  <div class="swatches">${[...Array(10)].map((_,i)=>`<i class="${i===2?'on':''}" style="--c:${col(i)}"></i>`).join('')}</div>
+  <div class="lbl">Avatar</div>
+  <div class="avs">${['🦊','🐺','🦉','🐙','🦈','🐸','🦇','🐍','🦅','🐻','🦎','🕷'].map((e,i)=>`<i class="${i===0?'on':''}">${e}</i>`).join('')}</div>
+  <div class="grow"></div>
+  <button class="btn runner">Continue</button>
+</div>`};
+
+S.ready={g:'Entry',t:'Get ready',n:'One tap unlocks location, sound, wake lock, compass (iOS). Denied + weak GPS states below.',h:()=>`
+<div class="scr neutral">
+  <div class="disp" style="font-size:40px">Get ready</div>
+  <div class="card"><div class="setrow"><span>📍 Location</span><span class="tag r">Allowed</span></div>
+  <div class="setrow"><span>🔊 Sound</span><span class="tag r">Unlocked</span></div>
+  <div class="setrow"><span>📱 Keep screen awake</span><span class="tag r">On</span></div>
+  <div class="setrow"><span>🧭 Compass</span><span class="tag o">Needed in compass mode</span></div></div>
+  <div class="banner warn">GPS weak (±48 m). Move to open sky.</div>
+  <div class="banner danger">Location is off. Settings › Browser › Location › Allow.</div>
+  <p class="hint">Lower brightness. Keep this screen open or the game loses you.</p>
+  <div class="grow"></div>
+  <button class="btn runner" style="min-height:76px;font-size:30px">I'm ready</button>
+</div>`};
+
+S.lobby={g:'Lobby',t:'Lobby (host)',n:'Code is the hero. Start is disabled with a reason until zone + 2 players.',h:()=>`
+<div class="scr neutral scroll">
+  <div class="top"><span class="lbl">Join code</span><span class="pill"><small>Host</small>You</span></div>
+  <div class="code big"><span>K</span><span>7</span><span>F</span><span>Q</span></div>
+  <div class="row"><button class="btn sm ghost" style="min-height:48px;font-size:15px">Copy link</button><button class="btn sm ghost" style="min-height:48px;font-size:15px">Share</button><button class="btn sm ghost" style="min-height:48px;font-size:15px">QR</button></div>
+  <div style="height:120px;display:flex">${map({you:[180,250,'#1fe3b4']})}</div>
+  <div class="row mut" style="font-size:13px;justify-content:space-between"><span>⏱ 20 min</span><span>🏃 3:00 head start</span><span>🎯 Map mode</span></div>
+  <div class="lbl">Players · ${players.length}</div>
+  ${players.map((p,i)=>`<div class="player ${i===5?'off':''}">${av(p[2],p[1],'',i===0)}<b class="grow">${p[0]}</b>${i===5?'<span class="tag o">Offline</span>':i<2?`<span class="tag ${p[3]}">${p[3]==='c'?'Chaser':'Runner'}</span>`:''}</div>`).join('')}
+  <p class="hint">Chasers picked randomly at start</p>
+  <div class="row"><button class="btn sm" style="width:40%">Settings</button><button class="btn sm" style="width:60%">Draw zone</button></div>
+  <button class="btn runner">Start game</button>
+  <p class="hint">Need a zone and 2+ players</p>
+</div>`};
+
+S.lobbyg={g:'Lobby',t:'Lobby (guest)',n:'Settings read-only. Waiting state.',h:()=>`
+<div class="scr neutral">
+  <div class="code big"><span>K</span><span>7</span><span>F</span><span>Q</span></div>
+  <div style="height:150px;display:flex">${map({you:[180,250,'#1fe3b4']})}</div>
+  ${players.slice(0,4).map((p,i)=>`<div class="player">${av(p[2],p[1],'',i===0)}<b class="grow">${p[0]}</b></div>`).join('')}
+  <div class="grow"></div>
+  <div class="card center"><span class="pulse">Waiting for host to start…</span></div>
+  <button class="btn ghost">Leave</button>
+</div>`};
+
+S.zone={g:'Lobby',t:'Zone setup',n:'Drag center, handle or slider. Dashed inner ring = shrink target. Jail pin when jail on.',h:()=>`
+<div class="scr neutral" style="padding-bottom:20px">
+  <div class="top"><span class="disp" style="font-size:30px">Play zone</span><span class="pill">200 m</span></div>
+  ${map({shrink:true,jail:true,you:[180,250,'#1fe3b4']})}
+  <div class="slider"><i style="width:35%"></i><u style="left:35%"></u></div>
+  <div class="row"><button class="btn sm">📍 My location</button><button class="btn sm">⛓ Jail pin</button></div>
+  <button class="btn runner">Save zone</button>
+</div>`};
+
+S.settings={g:'Lobby',t:'Settings (host)',n:'Grouped; sub-options hide when switch off; rare items in Advanced.',h:()=>`
+<div class="scr neutral scroll">
+  <div class="disp" style="font-size:36px">Settings</div>
+  <div class="lbl">Players</div>
+  <div class="card"><div class="setrow"><span>Chasers</span><div class="step"><b>−</b><span>2</span><b>+</b></div></div>
+  <div class="seg" style="margin:6px 0"><button class="on">Random</button><button>Host picks</button></div></div>
+  <div class="lbl">Time</div>
+  <div class="card"><div class="setrow"><span>Duration</span><span class="v">20 min</span></div>
+  <div class="slider"><i style="width:40%"></i><u style="left:40%"></u></div>
+  <div class="setrow"><span>Head start</span><div class="switch on"></div></div>
+  <div class="setrow"><span>Length</span><span class="v">3:00</span></div></div>
+  <div class="lbl">Location updates</div>
+  <div class="card"><div class="seg"><button class="on">Every X</button><button>Live</button><button>Off</button></div>
+  <div class="setrow"><span>Every</span><span class="v">2:00</span></div>
+  <div class="setrow"><span>Fuzzy</span><div class="switch on"></div></div>
+  <div class="setrow"><span>Circle size</span><span class="v">60 m</span></div>
+  <div class="setrow"><span>Final countdown</span><div class="switch on"></div></div>
+  <div class="setrow"><span>Anti-camping</span><div class="switch"></div></div></div>
+  <div class="lbl">Runners see</div>
+  <div class="seg"><button class="on">Map</button><button>Compass</button><button>Nothing</button></div>
+  <div class="lbl">When caught</div>
+  <div class="card"><div class="setrow"><span>Infection</span><div class="switch"></div></div><div class="setrow"><span>Jailbreak</span><div class="switch on"></div></div>
+  <div class="setrow"><span>Jail size</span><span class="v">15 m</span></div><div class="setrow"><span>Seconds to free</span><span class="v">5 s</span></div><div class="setrow"><span>Immunity</span><span class="v">10 s</span></div></div>
+  <div class="setrow card"><span>Advanced ▾</span><span class="mut">Catch distance, grace…</span></div>
+  <div class="setrow card"><span>Sounds & announcements</span><div class="switch on"></div></div>
+</div>`};
+
+S.revc={g:'Start',t:'Role reveal: chaser',n:'Full-screen takeover in role color. Scale-in text; reduced motion = fade.',h:()=>`
+<div class="take chaser"><div class="lbl" style="color:var(--chaser)">You are a</div><div class="big" style="color:var(--chaser);font-size:92px">Chaser</div>
+<p>Stay at the start. Close your eyes.<br><b>Release in 3:00</b></p></div>`};
+S.revr={g:'Start',t:'Role reveal: runner',n:'',h:()=>`
+<div class="take runner"><div class="lbl" style="color:var(--runner)">You are a</div><div class="big" style="color:var(--runner);font-size:92px">Runner</div>
+<p>Run and hide!<br><b>Chasers released in 3:00</b></p></div>`};
+
+S.hsc={g:'Start',t:'Head start: chaser',n:'Blacked out, giant countdown, no map.',h:()=>`
+<div class="scr chaser" style="background:#000"><div class="grow" style="display:flex;flex-direction:column;justify-content:center;gap:12px">
+<div class="lbl center" style="color:var(--chaser)">Chasers released in</div><div class="timer" style="color:var(--chaser);font-size:110px">2:41</div>
+<div class="disp center" style="font-size:36px">Don't peek.</div></div></div>`};
+
+S.chaser={g:'Chase',t:'Chaser view',n:'Map dominant. Fuzzy dashed circles + age labels, fading with age. Catch button in thumb zone. Ability slot reserved (Radar).',h:()=>`
+<div class="scr chaser" style="padding-bottom:20px">
+  <div class="top"><div class="pill" style="font-size:22px">12:48</div><div class="pill"><small>Next</small>1:12</div><div class="pill"><small>Free</small>3/5</div></div>
+  ${map({you:[170,260,'#ff5a2c'],chasers:[[240,200,'#b57bff','Dev']],hints:[[90,150,46,'#1fe3b4','Ava','40s ago',.95],[270,330,40,'#5aa9ff','Ben','3:10 ago',.45]],exact:[[130,400,'#ff6ec7','Cleo','LEFT ZONE']],jail:true})}
+  <div class="row"><button class="btn sm" style="width:84px;font-size:14px">☢ Radar</button><button class="btn chaser" style="min-height:68px;font-size:28px">Catch</button></div>
+</div>`};
+
+S.chaserFinal={g:'Chase',t:'Chaser: final countdown',n:'Timer turns red + pulses; updates faster; banner.',h:()=>`
+<div class="scr chaser" style="padding-bottom:20px">
+  <div class="banner danger">⚠ Final countdown. Updates every 30 s.</div>
+  <div class="top"><div class="pill pulse" style="font-size:26px;color:var(--danger)">2:41</div><div class="pill"><small>Next</small>0:14</div><div class="pill"><small>Free</small>2/5</div></div>
+  ${map({you:[170,260,'#ff5a2c'],hints:[[220,180,28,'#1fe3b4','Ava','10s ago']]})}
+  <button class="btn chaser" style="min-height:68px;font-size:28px">Catch</button>
+</div>`};
+
+S.picker={g:'Chase',t:'Catch picker',n:'Bottom sheet. Pick free runner → waiting state with auto-confirm.',h:()=>`
+<div class="scr chaser" style="justify-content:flex-end;padding-bottom:20px;background:#000">
+  <div class="disp" style="font-size:36px">Who did you catch?</div>
+  ${[['Ava','🦊',2],['Ben','🦉',3]].map(p=>`<button class="player" style="min-height:72px;width:100%">${av(p[2],p[1])}<b style="font-size:20px">${p[0]}</b></button>`).join('')}
+  <div class="card center"><div class="lbl">Waiting for Ava to confirm…</div><div class="timer sm">auto in 12 s</div></div>
+  <div class="banner warn">Too far (42 m). Get closer.</div>
+  <button class="btn ghost">Cancel</button>
+</div>`};
+
+function runnerBase(inner,{hb=hbLevel,out=''}={}){return `
+<div class="scr runner" style="padding-bottom:20px">
+  ${hb?`<div class="vig l${hb}"></div>`:''}
+  <div class="top"><div class="timer sm" style="color:var(--runner)">12:48</div><span class="pill"><small>Free</small>3/5</span></div>
+  ${inner}
+  <div class="heart">${[1,2,3].map(i=>`<i class="${hb>=i?'on'+i:''}"></i>`).join('')}</div>
+  <div class="disp center" style="font-size:26px;color:${['var(--tx3)','var(--warn)','#ff7a2c','var(--danger)'][hb]}">${['All quiet','Chaser nearby','Chaser close','Chaser VERY close'][hb]}</div>
+</div>`}
+S.rmap={g:'Chase',t:'Runner: map',n:'Dim map, you + zone + jail only. No chasers. Heartbeat vignette is the signature; use the level slider →',hb:1,h:()=>runnerBase(map({you:[170,260,'#1fe3b4'],dim:true,jail:true}))};
+S.rcomp={g:'Chase',t:'Runner: compass',n:'One big arrow, no distance.',hb:1,h:()=>runnerBase(`<div class="map" style="display:grid;place-items:center"><svg viewBox="0 0 200 200" width="240"><circle cx="100" cy="100" r="92" fill="none" stroke="#262d30" stroke-width="3"/><text x="100" y="22" text-anchor="middle" fill="#55616b" font-size="13" font-weight="700">N</text><g transform="rotate(48 100 100)"><path d="M100 24 L132 110 L100 96 L68 110 Z" fill="#ff2d4f"/></g></svg></div>`)};
+S.rnone={g:'Chase',t:'Runner: nothing',n:'Stealthiest. Timer + meter only.',hb:1,h:()=>runnerBase(`<div class="grow"></div>`)};
+
+S.oz={g:'Alerts',t:'Out of zone',n:'Red takeover, escalates to "Chasers can see you!"',h:()=>`
+<div class="take red"><div class="big" style="color:var(--danger);font-size:76px">Get back in!</div><div class="timer red pulse">8 s</div><p>Chasers see you in 8 s</p>
+<div class="map" style="flex:none;height:130px">${map({you:[210,60,'#ff2d4f']}).replace('class="map"','')}</div></div>`};
+S.ozr={g:'Alerts',t:'Out of zone: revealed',n:'',h:()=>`
+<div class="take red"><div class="big" style="color:#fff;font-size:70px">Chasers can see you!</div><p>Get back inside the zone</p></div>`};
+S.catchreq={g:'Alerts',t:'Catch request',n:'Two huge buttons + auto-confirm countdown.',h:()=>`
+<div class="take chaser"><div class="lbl">Catch request</div><div class="big" style="font-size:54px">Sam says<br>they caught you</div><div class="timer sm">auto-yes in 12 s</div><div class="grow"></div>
+<button class="btn runner" style="min-height:84px;font-size:30px">Yes, caught</button><button class="btn danger" style="min-height:84px;font-size:30px">No, they didn't</button></div>`};
+S.reveal={g:'Alerts',t:'You were revealed',n:'Dim red flash over runner screen + sound.',h:()=>runnerBase(map({you:[170,260,'#1fe3b4'],dim:true}),{hb:0}).replace('<div class="top">','<div class="banner danger" style="justify-content:center">📡 Your location was just sent</div><div class="top">')};
+S.toasts={g:'Alerts',t:'Toast / banner / takeover',n:'Escalation ladder: info → warning → danger.',h:()=>`
+<div class="scr neutral"><div class="disp" style="font-size:34px">Alert ladder</div>
+<div class="toast">Ben joined</div><div class="toast">Sam caught Ava!</div>
+<div class="banner info">ℹ Locations updated</div><div class="banner warn">⚠ Zone is shrinking</div><div class="banner warn">⏱ 1 minute left</div><div class="banner danger">🚨 Anti-camping: exact locations next</div>
+<div class="banner danger" style="background:var(--danger);color:#fff;font:800 28px var(--disp);text-transform:uppercase;justify-content:center;padding:22px">Jailbreak! Dev freed 3</div>
+<div class="grow"></div><div class="banner warn">📶 Reconnecting…</div><div class="banner danger">You were kicked from the game</div></div>`};
+
+S.jailed={g:'Caught',t:'Jailed',n:'Jail map + teammate status. Freeing ring + immunity badge for rescuer view.',h:()=>`
+<div class="scr runner" style="--accent:var(--warn);padding-bottom:20px">
+  <div class="disp" style="font-size:44px;color:var(--warn)">You're in jail</div><p class="mut">Walk to the jail and wait for a teammate.</p>
+  ${map({you:[120,330,'#1fe3b4'],jail:true,dim:true})}
+  <div class="row">${[['Ava','🦊',2,'free'],['Ben','🦉',3,'free']].map(p=>`<div class="player grow">${av(p[2],p[1],'sm')}<span>${p[0]}</span></div>`).join('')}</div>
+</div>`};
+S.free={g:'Caught',t:'Jailbreak progress',n:'Hold ring while standing in jail; immunity badge after.',h:()=>`
+<div class="scr runner"><div class="top"><div class="timer sm" style="color:var(--runner)">09:12</div><span class="badge">🛡 Immune 8 s</span></div>
+<div class="grow" style="display:flex;flex-direction:column;justify-content:center;gap:16px"><div class="ring"><b>3/5</b></div><div class="disp center" style="font-size:36px">Freeing your team…</div></div></div>`};
+S.spec={g:'Caught',t:'Spectator',n:'God view: everyone live + roster.',h:()=>`
+<div class="scr neutral" style="padding-bottom:20px"><div class="top"><span class="tag o">Spectating</span><div class="pill">08:04</div></div>
+${map({chasers:[[240,200,'#b57bff','Dev'],[150,310,'#ff5a2c','Sam']],exact:[[100,160,'#1fe3b4','Ava',''],[270,330,'#5aa9ff','Ben','']],jail:true})}
+<div class="row" style="flex-wrap:wrap">${players.slice(0,4).map(p=>`<span class="pill">${p[1]} ${p[0]}</span>`).join('')}</div></div>`};
+S.inf={g:'Caught',t:'Infected',n:'Transition into chaser view.',h:()=>`
+<div class="take chaser"><div class="big" style="color:var(--chaser);font-size:70px">You're infected!</div><p>You're a chaser now. Hunt them.</p></div>`};
+S.pause={g:'Alerts',t:'Paused',n:'Overlay on everything; host gets Resume.',h:()=>`
+<div class="take" style="background:#000e"><div class="big">Paused</div><p class="mut">Game paused by host</p><button class="btn runner">Resume</button><button class="btn danger">End game</button></div>`};
+
+S.end={g:'End',t:'End screen',n:'Winner, awards, stats, replay scrubber, share, play again.',h:()=>`
+<div class="scr neutral scroll">
+  <div class="center"><div class="lbl">Time's up</div><div class="disp" style="font-size:68px;color:var(--runner)">Runners win!</div></div>
+  <div class="row" style="flex-wrap:wrap"><div class="award" style="flex:1 1 45%"><span class="lbl">Longest survivor</span><b>14:02</b><span>${players[0][1]} Ava</span></div><div class="award" style="flex:1 1 45%"><span class="lbl">Top chaser</span><b>3 catches</b><span>${players[1][1]} Sam</span></div><div class="award" style="flex:1 1 45%"><span class="lbl">Closest call</span><b>2.1 m</b><span>${players[2][1]} Ben</span></div><div class="award" style="flex:1 1 45%"><span class="lbl">Marathon</span><b>3.4 km</b><span>${players[3][1]} Cleo</span></div></div>
+  <div style="height:200px;display:flex">${map({hints:[],chasers:[],exact:[]}).replace('</svg>','<polyline points="60,400 120,320 160,260 220,230 270,140" fill="none" stroke="#1fe3b4" stroke-width="3"/><polyline points="300,420 250,330 200,280 190,250" fill="none" stroke="#ff5a2c" stroke-width="3"/><circle cx="270" cy="140" r="7" fill="#1fe3b4"/><circle cx="190" cy="250" r="7" fill="#ff5a2c"/></svg>')}</div>
+  <div class="slider"><i style="width:62%;background:var(--tx2)"></i><u style="left:62%"></u></div><div class="hint">Replay · 12:20 / 20:00 · ▮ catch ▮ jailbreak</div>
+  <div class="card">${players.slice(0,4).map(p=>`<div class="setrow"><span>${p[1]} ${p[0]}</span><span class="mut" style="font-size:12px">${p[3]==='c'?'Chaser':'Runner'} · 12:40 · ${p[3]==='c'?'3 catches':'1.2 km'}</span></div>`).join('')}</div>
+  <button class="btn">Share card</button><button class="btn runner">Play again</button><button class="btn ghost">Leave</button>
+</div>`};
+
+S.sys={g:'System',t:'Design system',n:'Tokens, type, components.',h:()=>`
+<div class="scr neutral scroll"><div class="sys">
+<h2>Role + alert colors</h2>
+<div class="pal"><div><i style="background:#000;border:1px solid #333"></i>Base</div><div><i style="background:var(--chaser)"></i>Chaser</div><div><i style="background:var(--runner)"></i>Runner</div><div><i style="background:var(--warn)"></i>Warn</div><div><i style="background:var(--danger)"></i>Danger</div></div>
+<h2>Player colors</h2><div class="swatches">${[...Array(10)].map((_,i)=>`<i style="--c:${col(i)}"></i>`).join('')}</div>
+<h2>Type</h2><div class="disp" style="font-size:48px">Barlow Cond 800</div><div class="timer sm">12:48 · JetBrains Mono</div><p>Inter 15/600 for UI text</p>
+<h2>Map elements</h2><div style="height:170px;display:flex">${map({you:[100,300,'#1fe3b4'],chasers:[[260,150,'#b57bff','Dev']],hints:[[110,120,40,'#5aa9ff','Ben','40s ago'],[250,330,36,'#ff6ec7','Cleo','4m ago',.4]],exact:[],shrink:true,jail:true})}</div>
+<h2>Controls</h2><div class="seg"><button class="on">A</button><button>B</button><button>C</button></div><div class="setrow"><span>Switch</span><div class="switch on"></div></div><div class="step"><b>−</b><span>2</span><b>+</b></div>
+<div class="row"><span class="badge">🛡 Immune 8 s</span><span class="tag c">Chaser</span><span class="tag r">Runner</span><span class="tag j">Jailed</span></div>
+<h2>Motion</h2><p class="mut">Role reveal scale-in · heartbeat 1.4/0.9/0.5 s · ping ripple on update · confetti on jailbreak. All off under reduced motion; fall back to opacity fades + labels.</p>
+<h2>Runner stealth</h2><p class="mut">Max brightness capped via filter; no white; red/teal at low luminance.</p>
+</div></div>`};
+
+/* ---------- nav + render ---------- */
+const keys=Object.keys(S);
+let cur=location.hash.slice(1)||'home'; if(!S[cur])cur='home';
+function nav(){
+  let g='';$('#nav').innerHTML='<h1>MANHUNT</h1><small>Design prototype</small>'+keys.map(k=>{
+    const h=S[k].g!==g?`<h4>${S[k].g}</h4>`:'';g=S[k].g;
+    return h+`<button class="${k===cur?'on':''}" data-k="${k}">${S[k].t}</button>`}).join('');
+}
+function render(){
+  $('#view').innerHTML=S[cur].h();
+  $('#notes').textContent=S[cur].n||'';
+  const hasHb=S[cur].hb!==undefined;$('#hbctl').style.display=hasHb?'block':'none';
+  $('#hbtxt').textContent=['0 none','1 far ~80 m','2 close ~50 m','3 very close ~25 m'][hbLevel]+' · label + meter + vignette (never color alone)';
+  nav();location.hash=cur;
+}
+$('#nav').onclick=e=>{const k=e.target.dataset.k;if(k){cur=k;if(S[k].hb!==undefined)hbLevel=hbLevel||S[k].hb;render()}};
+$('#hb').oninput=e=>{hbLevel=+e.target.value;render()};
+$('#hb').value=hbLevel;
+$('#stealth').onchange=e=>document.body.classList.toggle('stealth',e.target.checked);
+$('#reduce').onchange=e=>document.body.classList.toggle('reduce',e.target.checked);
+addEventListener('keydown',e=>{const i=keys.indexOf(cur);if(e.key==='ArrowDown'||e.key==='ArrowRight'){cur=keys[Math.min(i+1,keys.length-1)];render()}if(e.key==='ArrowUp'||e.key==='ArrowLeft'){cur=keys[Math.max(i-1,0)];render()}});
+render();
+</script>
+</body>
+</html>
