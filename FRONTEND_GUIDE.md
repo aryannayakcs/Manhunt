@@ -208,6 +208,9 @@ If a value is out of range, you get `error` with code `bad_settings`, and the se
 | Out-of-zone grace | `outOfZone.graceSec` | slider | 0–300 s | 15 |
 | Catch distance | `catching.radiusM` | slider | 5–100 m | 15 |
 | Auto-confirm catch after | `catching.autoAcceptSec` | slider | 5–120 s | 15 |
+| Auto-catch when close | `catching.auto` | switch (no tag or confirm: staying close catches the runner) | | off |
+| …auto-catch distance | `catching.autoRadiusM` | slider | 2–30 m | 5 (≈16 ft) |
+| …must stay close for | `catching.autoHoldSec` | slider | 0–10 s | 2 |
 
 Infection and jailbreak are both options of **When caught** (`caughtMode`), because a caught runner can't both become a chaser and go to jail. You can still show them as two switches in your UI: turning one on sets `caughtMode` to `'infection'` or `'jail'`, and turning both off sets `'out'`.
 
@@ -237,7 +240,7 @@ Events are one-off moments. Play a sound or voice line and show a toast. Only pl
 | `catch_request` | the runner and chaser | `catchId, chaserId, runnerId` | runner: show the confirm modal |
 | `catch_disputed` | chaser, runner, host | `catchId, chaserId, runnerId` | "Ava disputed the catch" |
 | `catch_rejected` | chaser | `runnerId, distanceM` | "Too far (42 m)" |
-| `player_caught` | all | `runnerId, chaserId, mode` | "Sam caught Ava!" |
+| `player_caught` | all | `runnerId, chaserId, mode, auto` | "Sam caught Ava!" |
 | `player_infected` | all | `playerId` | "Ava is infected!" |
 | `player_jailed` | all | `playerId` | "Ava is in jail" |
 | `jailbreak` | all | `byId, freedIds` | "JAILBREAK! Dev freed 3 runners" |

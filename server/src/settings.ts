@@ -100,6 +100,12 @@ export const SettingsSchema = z.object({
     radiusM: z.number().min(5).max(100),
     /** If the runner doesn't confirm or dispute, the catch counts after this many seconds. */
     autoAcceptSec: z.number().int().min(5).max(120),
+    /** Auto-catch: a chaser who stays this close to a runner catches them, no tap or confirmation needed. */
+    auto: z.boolean(),
+    /** Auto-catch distance in meters (5 m is about 15 ft). */
+    autoRadiusM: z.number().min(2).max(30),
+    /** Seconds the chaser must stay that close (filters out GPS jumps). 0 = instantly. */
+    autoHoldSec: z.number().int().min(0).max(10),
   }),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
@@ -121,7 +127,7 @@ export const DEFAULT_SETTINGS: Settings = {
   visibility: { runnersSeeChasers: false, chasersSeeChasers: true },
   antiCamping: { enabled: false, afterMin: 6 },
   outOfZone: { graceSec: 15 },
-  catching: { radiusM: 15, autoAcceptSec: 15 },
+  catching: { radiusM: 15, autoAcceptSec: 15, auto: false, autoRadiusM: 5, autoHoldSec: 2 },
 };
 
 /** Deep partial used for settings updates. */

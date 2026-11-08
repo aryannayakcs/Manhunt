@@ -26,7 +26,7 @@ export const SETTINGS: Settings = {
   visibility: { runnersSeeChasers: false, chasersSeeChasers: true },
   antiCamping: { enabled: false, afterMin: 6 },
   outOfZone: { graceSec: 15 },
-  catching: { radiusM: 15, autoAcceptSec: 15 },
+  catching: { radiusM: 15, autoAcceptSec: 15, auto: false, autoRadiusM: 5, autoHoldSec: 2 },
 };
 
 const pl = (id: string, name: string, avatar: string, color: string, role: PublicPlayer['role']): PublicPlayer =>

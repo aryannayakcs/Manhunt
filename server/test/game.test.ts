@@ -267,3 +267,29 @@ test('staged zone: holds, shrinks one step at a time, announces each stage', () 
   assert.equal(z().nextRadiusM, null);
   assert.equal(events(host.id).filter(e => e === 'zone_shrinking').length, 3);
 });
+
+test('auto-catch: staying within range catches the runner with no tap or confirmation', () => {
+  const { game, host, advance, roles, events } = setup(3, { headStart: { enabled: false, seconds: 10 }, catching: { auto: true, autoRadiusM: 5, autoHoldSec: 2 } });
+  game.handle(host.id, { type: 'start_game' });
+  const { chasers: [c], runners: [r1, r2] } = roles();
+  const put = (id: string, m: number, accuracy = 5) => { const p = offsetPoint(CENTER, m, 90); game.handle(id, { type: 'location', lat: p.lat, lng: p.lng, accuracy }); };
+  const step = (cm: number, r1m: number, acc = 5) => { put(c.id, cm); put(r1.id, r1m, acc); put(r2.id, -150); advance(1); };
+  step(0, 20); step(0, 20);
+  assert.equal(r1.status, 'free', 'not caught at 20 m');
+  step(0, 4, 40); step(0, 4, 40); step(0, 4, 40);
+  assert.equal(r1.status, 'free', 'not caught when GPS accuracy is poor');
+  step(0, 4); // first moment close
+  assert.equal(r1.status, 'free', 'has to stay close for the hold time');
+  step(0, 3); step(0, 3);
+  assert.equal(r1.status, 'out', 'caught automatically');
+  assert.ok(events(c.id).includes('player_caught'));
+  assert.equal(game.phase, 'active', 'other runner still free');
+});
+
+test('auto-catch is off by default', () => {
+  const { game, host, at, advance, roles } = setup(2, { headStart: { enabled: false, seconds: 10 } });
+  game.handle(host.id, { type: 'start_game' });
+  const { chasers: [c], runners: [r] } = roles();
+  for (let i = 0; i < 5; i++) { at(c.id, 0); at(r.id, 1); advance(1); }
+  assert.equal(r.status, 'free');
+});

@@ -272,6 +272,20 @@ function Settings({ s, back, openZone }: { s: GameState; back: () => void; openZ
           )}
         </div>
 
+        <div className="lbl">Catching</div>
+        <div className="card">
+          <Row label={<span>Auto-catch when close<br /><small className="mut">No tag or confirm needed: get close enough and they&apos;re caught</small></span>}>
+            <Switch on={st.catching.auto} set={(v) => up({ catching: { auto: v } })} />
+          </Row>
+          {st.catching.auto && (
+            <>
+              <Slider label="Catch distance" value={st.catching.autoRadiusM} min={2} max={30} fmt={(v) => `${v} m (${Math.round(v * 3.28)} ft)`} set={(v) => up({ catching: { autoRadiusM: v } })} />
+              <Slider label="Must stay that close for" value={st.catching.autoHoldSec} min={0} max={10} fmt={(v) => (v === 0 ? 'instantly' : `${v} s`)} set={(v) => up({ catching: { autoHoldSec: v } })} />
+              <p className="hint" style={{ textAlign: 'left', paddingBottom: 6 }}>Phone GPS is only accurate to about 5–10 m, so very short distances can trigger a little early or late. It only fires when both phones have a good GPS fix. The Catch button still works too.</p>
+            </>
+          )}
+        </div>
+
         <div className="card"><Row label="Sounds & announcements"><Switch on={st.announcements} set={(v) => up({ announcements: v })} /></Row></div>
 
         <button className="card setrow" type="button" onClick={() => setAdv((a) => !a)}><span>Advanced {adv ? '▴' : '▾'}</span><span className="mut">Catch distance, grace…</span></button>

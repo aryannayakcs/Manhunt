@@ -12,7 +12,7 @@
 - Phones that go dark for 30 s reveal the runner's last spot ("PHONE OFF"); lock-the-app guide in the lobby
 - Zone can be placed anywhere: place search, tap to move, drag the edge to resize (up to 20 km)
 - /gallery page showing every screen with sample data
-- Catch with distance check, confirm/dispute, auto-confirm
+- Catch with distance check, confirm/dispute, auto-confirm; optional auto-catch when a chaser stays within a set distance (needs good GPS on both phones)
 - Host controls: pause, resume, end, kick, transfer host, rematch
 - Event stream for sounds and announcements
 - End screen data: winner, awards, stats, route replay, timeline

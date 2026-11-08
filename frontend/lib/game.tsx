@@ -137,7 +137,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       case 'catch_request': if (d.runnerId === me?.id) { sfx.alarm(); buzz([300, 100, 300, 100, 300]); } break;
       case 'catch_disputed': toast(cap(`${nameOf(d.runnerId)} disputed the catch`), 'warn'); break;
       case 'catch_rejected': toast(`Too far (${Math.round(Number(d.distanceM))} m). Get closer`, 'warn'); break;
-      case 'player_caught': sfx.catch(); toast(cap(`${nameOf(d.chaserId)} caught ${nameOf(d.runnerId)}!`), 'danger'); if (d.runnerId === me?.id) doFlash('caught', 'You were caught'); break;
+      case 'player_caught': sfx.catch(); buzz([500]); toast(cap(`${nameOf(d.chaserId)} caught ${nameOf(d.runnerId)}!${d.auto ? ' (auto-catch)' : ''}`), 'danger'); if (d.runnerId === me?.id) doFlash('caught', 'You were caught'); break;
       case 'player_infected': toast(d.playerId === me?.id ? "You're infected!" : `${nameOf(d.playerId)} is infected!`, 'danger'); if (d.playerId === me?.id) doFlash('infected', "You're infected! You're a chaser now", 3500); break;
       case 'player_jailed': toast(d.playerId === me?.id ? "You're in jail" : `${nameOf(d.playerId)} is in jail`, 'warn'); break;
       case 'jailbreak': sfx.fanfare(); say('Jailbreak!'); doFlash('jailbreak', `JAILBREAK! ${cap(nameOf(d.byId))} freed ${(d.freedIds as string[] | undefined)?.includes(me?.id ?? '') ? 'you' : (d.freedIds as unknown[] | undefined)?.length ?? 0}`, 3500); break;

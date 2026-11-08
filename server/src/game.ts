@@ -9,6 +9,9 @@ export const MAX_PLAYERS = 50;
 const FRESH_MS = 30_000; // a location older than this is "stale"
 /** A runner whose phone sends nothing for this long (locked, Safari closed, no signal) gets revealed. */
 const SIGNAL_LOST_MS = 30_000;
+/** Auto-catch only trusts GPS fixes this fresh and this accurate (on both phones). */
+const AUTO_FRESH_MS = 4_000;
+const AUTO_MAX_ACCURACY_M = 15;
 const ROUTE_SAMPLE_MS = 5_000;
 
 interface Loc { lat: number; lng: number; accuracy: number; at: number }
@@ -38,6 +41,8 @@ interface Player {
   signalLost: boolean;
   immuneUntil: number; // game ms
   jailHoldSince: number | null; // game ms
+  /** Auto-catch: which chaser has been close to this runner, and since when (game ms). */
+  autoNear: { chaserId: string; since: number } | null;
 }
 
 interface Reveal { lat: number; lng: number; radiusM: number; exact: boolean; reason: RunnerMarker['reason']; at: number }
@@ -391,6 +396,7 @@ export class Game {
       this.announcements(e);
       this.doReveals(e);
       this.checkJailbreak(e);
+      this.checkAutoCatch(e);
       this.trackClosestCalls();
       for (const pc of this.pending.values()) if (e >= pc.expiresAt) this.applyCatch(pc);
       if (this.inPlay() && this.elapsed() >= this.endAt) {
@@ -594,7 +600,31 @@ export class Game {
     }
   }
 
-  private applyCatch(pc: Pending) {
+  /** Auto-catch: a chaser who stays within autoRadiusM of a runner for autoHoldSec catches them. */
+  private checkAutoCatch(e: number) {
+    const c = this.settings.catching;
+    if (!c.auto) return;
+    const now = this.now();
+    const good = (l: Loc | null): l is Loc => !!l && now - l.at <= AUTO_FRESH_MS && l.accuracy <= AUTO_MAX_ACCURACY_M;
+    const chasers = [...this.players.values()].filter(p => p.role === 'chaser' && p.status === 'free' && good(p.loc));
+    for (const r of [...this.players.values()]) {
+      if (r.role !== 'runner' || r.status !== 'free' || r.immuneUntil > e || !good(r.loc)) { r.autoNear = null; continue; }
+      let best: { id: string; d: number } | null = null;
+      for (const ch of chasers) {
+        const d = distanceM(r.loc, ch.loc!);
+        if (d <= c.autoRadiusM && (!best || d < best.d)) best = { id: ch.id, d };
+      }
+      if (!best) { r.autoNear = null; continue; }
+      if (!r.autoNear || r.autoNear.chaserId !== best.id) r.autoNear = { chaserId: best.id, since: e };
+      if (e - r.autoNear.since >= c.autoHoldSec * 1000) {
+        for (const pc of this.pending.values()) if (pc.runnerId === r.id) this.pending.delete(pc.id);
+        this.applyCatch({ id: newId('c_'), chaserId: best.id, runnerId: r.id, expiresAt: e }, true);
+        if (!this.inPlay()) return; // that catch ended the game
+      }
+    }
+  }
+
+  private applyCatch(pc: Pending, auto = false) {
     this.pending.delete(pc.id);
     const runner = this.players.get(pc.runnerId);
     const chaser = this.players.get(pc.chaserId);
@@ -613,7 +643,8 @@ export class Game {
     const mode = this.settings.caughtMode;
     if (mode === 'infection') runner.role = 'chaser';
     else runner.status = mode === 'jail' ? 'jailed' : 'out';
-    this.emit('player_caught', { runnerId: runner.id, chaserId: pc.chaserId, mode });
+    runner.autoNear = null;
+    this.emit('player_caught', { runnerId: runner.id, chaserId: pc.chaserId, mode, auto });
     if (mode === 'infection') this.emit('player_infected', { playerId: runner.id });
     if (mode === 'jail') this.emit('player_jailed', { playerId: runner.id });
     this.checkWin();
@@ -776,7 +807,7 @@ function freshStats() {
   return {
     route: [] as Array<[number, number, number]>, lastRouteAt: 0, distanceM: 0, distAnchor: null, catches: 0,
     closestCallM: null, caughtAtChaseMs: null, inZone: null, outOfZoneSince: null,
-    revealedOut: false, signalLost: false, immuneUntil: 0, jailHoldSince: null,
+    revealedOut: false, signalLost: false, immuneUntil: 0, jailHoldSince: null, autoNear: null,
   };
 }
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;

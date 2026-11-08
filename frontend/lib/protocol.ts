@@ -21,7 +21,7 @@ export interface Settings {
   visibility: { runnersSeeChasers: boolean; chasersSeeChasers: boolean };
   antiCamping: { enabled: boolean; afterMin: number };
   outOfZone: { graceSec: number };
-  catching: { radiusM: number; autoAcceptSec: number };
+  catching: { radiusM: number; autoAcceptSec: number; auto: boolean; autoRadiusM: number; autoHoldSec: number };
 }
 
 export interface PublicPlayer {

@@ -82,6 +82,7 @@ export function ChaserView({ s, headStart, initialPick = false }: { s: GameState
       <HuntList s={s} />
       {pc && <div className="card center" style={{ flex: 'none' }}><div className="lbl">Waiting for {target?.name} to confirm…</div><div className="timer sm">auto in {pc.autoAcceptInSec} s</div></div>}
       <button className="btn chaser" style={{ minHeight: 68, fontSize: 28 }} disabled={!!pc || free.length === 0} onClick={() => setPick(true)}>Catch</button>
+      {s.settings.catching.auto && <p className="hint" style={{ marginTop: -4 }}>⚡ Auto-catch on: stay within {s.settings.catching.autoRadiusM} m ({Math.round(s.settings.catching.autoRadiusM * 3.28)} ft) of a runner{s.settings.catching.autoHoldSec ? ` for ${s.settings.catching.autoHoldSec} s` : ''} to catch them</p>}
       {pick && (
         <div className="sheet">
           <div className="disp" style={{ fontSize: 36 }}>Who did you catch?</div>
@@ -184,7 +185,7 @@ export function RunnerView({ s, headStart }: { s: GameState; headStart: boolean 
           <Danger level={level} big />
         </div>
       ) : <Danger level={level} />}
-      <p className="hint">Keep this screen open · lower your brightness</p>
+      <p className="hint">{s.settings.catching.auto ? `⚡ Auto-catch: a chaser within ${Math.round(s.settings.catching.autoRadiusM * 3.28)} ft catches you · ` : ''}Keep this screen open · lower your brightness</p>
 
       {y.jailbreakProgressSec != null && y.jailbreakProgressSec > 0 && s.jail && (
         <div className="take dark" style={{ background: '#000c' }}>
