@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useGame } from '@/lib/game';
 import type { GameState, PublicPlayer } from '@/lib/protocol';
 import { sfx } from '@/lib/sound';
-import { fmtAge, fmtTime } from '@/lib/util';
+import { distM, fmtAge, fmtTime } from '@/lib/util';
 import Map, { type Circle, type Mk } from './Map';
 import { Avatar, Ring } from './ui';
 
@@ -60,7 +60,10 @@ export function ChaserView({ s, headStart }: { s: GameState; headStart: boolean 
       markers.push({ id: `rf-${r.playerId}`, lat: r.lat, lng: r.lng, color, kind: 'label', label: p?.name, sub: fmtAge(r.ageSec), opacity: op });
     }
   }
-  const free = freeRunners(s);
+  // Sort catch candidates by how close their last revealed location is to me.
+  const here = s.you.location;
+  const lastSeen = (id: string) => { const r = s.map.runners.find((x) => x.playerId === id); return r && here ? Math.max(0, distM(here, r) - r.radiusM) : null; };
+  const free = freeRunners(s).map((p) => ({ p, d: lastSeen(p.id) })).sort((a, b) => (a.d ?? 1e9) - (b.d ?? 1e9));
   const total = s.players.filter((p) => p.role === 'runner' || p.status !== 'free').length;
   const target = pc ? byId(s, pc.runnerId) : null;
 
@@ -78,11 +81,13 @@ export function ChaserView({ s, headStart }: { s: GameState; headStart: boolean 
       {pick && (
         <div className="sheet">
           <div className="disp" style={{ fontSize: 36 }}>Who did you catch?</div>
-          {free.map((p) => (
-            <button key={p.id} className="player" style={{ minHeight: 72 }} onClick={() => { send({ type: 'catch', runnerId: p.id }); setPick(false); }}>
-              <Avatar p={p} /><b style={{ fontSize: 20 }}>{p.name}</b>
+          {free.map(({ p, d }) => (
+            <button key={p.id} className="player" style={{ minHeight: 72 }} disabled={p.immuneSec > 0} onClick={() => { send({ type: 'catch', runnerId: p.id }); setPick(false); }}>
+              <Avatar p={p} /><b className="grow" style={{ fontSize: 20 }}>{p.name}</b>
+              {p.immuneSec > 0 ? <span className="badge">🛡 {p.immuneSec}s</span> : d != null && <span className="mut" style={{ fontSize: 13 }}>~{Math.round(d)} m</span>}
             </button>
           ))}
+          <p className="hint">Tap who you tagged. They confirm on their phone.</p>
           <button className="btn ghost" onClick={() => setPick(false)}>Cancel</button>
         </div>
       )}
@@ -132,7 +137,7 @@ export function RunnerView({ s, headStart }: { s: GameState; headStart: boolean 
         <div className="mapbox" style={{ display: 'grid', placeItems: 'center' }}>
           <svg viewBox="0 0 200 200" width="260" role="img" aria-label="Compass to nearest chaser">
             <circle cx="100" cy="100" r="92" fill="none" stroke="#262d30" strokeWidth="3" />
-            <text x="100" y="22" textAnchor="middle" fill="#55616b" fontSize="13" fontWeight="700">N</text>
+            <g style={{ transform: `rotate(${-heading}deg)`, transformOrigin: '100px 100px', transition: 'transform .3s' }}><text x="100" y="22" textAnchor="middle" fill="#55616b" fontSize="13" fontWeight="700">N</text></g>
             {y.compassBearing != null ? <g style={{ transform: `rotate(${rot}deg)`, transformOrigin: '100px 100px', transition: 'transform .3s' }}><path d="M100 24 L132 110 L100 96 L68 110 Z" fill="#ff2d4f" /></g>
               : <text x="100" y="106" textAnchor="middle" fill="#55616b" fontSize="14">no chaser data</text>}
           </svg>
@@ -181,6 +186,7 @@ export function JailedView({ s }: { s: GameState }) {
     <div className="scr runner dim" style={{ gap: 10, ['--accent' as string]: 'var(--warn)' }}>
       <div className="disp" style={{ fontSize: 44, color: 'var(--warn)' }}>You&apos;re in jail</div>
       <p className="mut">Walk to the jail and wait for a teammate to free you.</p>
+      {s.jail && s.you.location && <div className="banner warn" style={{ justifyContent: 'center' }}>⛓ Jail is {Math.round(distM(s.you.location, s.jail.location))} m away</div>}
       <Map zone={s.zone} jail={s.jail} markers={youMk(s, 'var(--runner)')} dim fit />
       <div className="row wrap" style={{ flex: 'none' }}>
         {mates.map((p) => <div key={p.id} className="player" style={{ width: 'auto', minHeight: 44, padding: '4px 10px' }}><Avatar p={p} size="sm" /><span>{p.name}</span><Tag2 p={p} /></div>)}

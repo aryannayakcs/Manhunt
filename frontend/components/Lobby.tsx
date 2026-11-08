@@ -10,7 +10,7 @@ import { Avatar, Code, Row, Seg, Slider, Stepper, Switch, Tag } from './ui';
 type View = 'main' | 'settings' | 'zone';
 
 export function Lobby({ s, onEditProfile }: { s: GameState; onEditProfile?: () => void }) {
-  const { send, leave, ready, makeReady, geo, accuracy, error, clearError, profile } = useGame();
+  const { send, leave, ready, makeReady, geo, accuracy, error, clearError, profile, notify } = useGame();
   const [view, setView] = useState<View>('main');
   const [qr, setQr] = useState<string | null>(null);
   const [showQr, setShowQr] = useState(false);
@@ -35,7 +35,7 @@ export function Lobby({ s, onEditProfile }: { s: GameState; onEditProfile?: () =
       <div className="top"><span className="lbl">Join code</span><span className="row">{host && <span className="pill"><small>Host</small>You</span>}{onEditProfile && profile && <button className="pill" aria-label="Edit character" onClick={onEditProfile}>{profile.avatar} Edit</button>}</span></div>
       <Code code={s.code} />
       <div className="row">
-        <button className="btn sm ghost" style={{ minHeight: 48, fontSize: 15 }} onClick={() => navigator.clipboard?.writeText(link)}>Copy link</button>
+        <button className="btn sm ghost" style={{ minHeight: 48, fontSize: 15 }} onClick={() => { navigator.clipboard?.writeText(link).then(() => notify('Link copied'), () => notify(link)); }}>Copy link</button>
         <button className="btn sm ghost" style={{ minHeight: 48, fontSize: 15 }} onClick={share}>Share</button>
         <button className="btn sm ghost" style={{ minHeight: 48, fontSize: 15 }} onClick={() => setShowQr((v) => !v)}>QR</button>
       </div>
@@ -80,7 +80,7 @@ export function Lobby({ s, onEditProfile }: { s: GameState; onEditProfile?: () =
       <div className="grow" />
       {host ? (
         <>
-          <div className="row"><button className="btn sm" style={{ width: '40%' }} onClick={() => setView('settings')}>Settings</button><button className="btn sm" style={{ width: '60%' }} onClick={() => setView('zone')}>Draw zone</button></div>
+          <div className="row"><button className="btn sm" onClick={() => setView('settings')}>Settings</button><button className="btn sm" style={{ flexGrow: 1.4 }} onClick={() => setView('zone')}>{s.zone.center ? 'Edit zone' : 'Draw zone'}</button></div>
           <button className="btn runner" disabled={!!startBlock} onClick={() => send({ type: 'start_game' })}>Start game</button>
           {startBlock && <p className="hint">{startBlock}</p>}
         </>

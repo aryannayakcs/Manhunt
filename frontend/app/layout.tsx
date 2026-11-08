@@ -11,7 +11,8 @@ export const metadata: Metadata = {
   title: 'Manhunt',
   description: 'Real-life tag after dark. Your phone is the referee.',
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/icon.svg', apple: '/icon.svg' },
+  icons: { icon: '/icon.svg', apple: '/apple-touch-icon.png' },
+  appleWebApp: { capable: true, title: 'Manhunt', statusBarStyle: 'black-translucent' },
 };
 export const viewport: Viewport = {
   width: 'device-width', initialScale: 1, maximumScale: 1, userScalable: false, viewportFit: 'cover', themeColor: '#000000',

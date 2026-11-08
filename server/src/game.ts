@@ -26,6 +26,7 @@ interface Player {
   route: Array<[number, number, number]>;
   lastRouteAt: number;
   distanceM: number;
+  distAnchor: LatLng | null;
   catches: number;
   closestCallM: number | null;
   caughtAtChaseMs: number | null;
@@ -490,10 +491,17 @@ export class Game {
 
   private onLocation(p: Player, m: { lat: number; lng: number; accuracy: number }) {
     const now = this.now();
-    if (p.loc && this.inPlay() && p.status === 'free') {
-      const step = distanceM(p.loc, m);
-      // Ignore GPS jitter and teleport glitches when counting distance.
-      if (m.accuracy <= 30 && step >= 3 && step <= 200) p.distanceM += step;
+    // Distance walked: measure from an anchor point and only count once you've moved 8+ m from it.
+    // Comparing each 1-second update would throw away every real walking step as "jitter".
+    if (this.inPlay() && p.status === 'free' && m.accuracy <= 30) {
+      if (!p.distAnchor) p.distAnchor = { lat: m.lat, lng: m.lng };
+      else {
+        const step = distanceM(p.distAnchor, m);
+        if (step >= 8) {
+          if (step <= 300) p.distanceM += step; // ignore teleport glitches
+          p.distAnchor = { lat: m.lat, lng: m.lng };
+        }
+      }
     }
     p.loc = { lat: m.lat, lng: m.lng, accuracy: m.accuracy, at: now };
     if (this.inPlay() && now - p.lastRouteAt >= ROUTE_SAMPLE_MS) {
@@ -567,7 +575,7 @@ export class Game {
   private ids(pred: (p: Player) => boolean) { return [...this.players.values()].filter(pred).map(p => p.id); }
 
   private emit(event: EventName, data?: Record<string, unknown>, to?: string[]) {
-    for (const id of to ?? this.players.keys()) {
+    for (const id of new Set(to ?? this.players.keys())) {
       if (this.players.has(id)) this.send(id, { type: 'event', event, data });
     }
   }
@@ -705,7 +713,7 @@ export class Game {
 
 function freshStats() {
   return {
-    route: [] as Array<[number, number, number]>, lastRouteAt: 0, distanceM: 0, catches: 0,
+    route: [] as Array<[number, number, number]>, lastRouteAt: 0, distanceM: 0, distAnchor: null, catches: 0,
     closestCallM: null, caughtAtChaseMs: null, inZone: null, outOfZoneSince: null,
     revealedOut: false, immuneUntil: 0, jailHoldSince: null,
   };

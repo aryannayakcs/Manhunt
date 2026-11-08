@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { ClientMessage, EventName, GameState, ServerMessage } from './protocol';
 import { lsDel, lsGet, lsSet } from './util';
-import { sfx, setSoundEnabled, speak, unlockAudio } from './sound';
+import { buzz, sfx, setSoundEnabled, speak, unlockAudio } from './sound';
 
 export interface Profile { name: string; color: string; avatar: string }
 interface Session { code: string; playerId: string; token: string }
@@ -33,12 +33,21 @@ interface Ctx {
   kicked: boolean;
   clearKicked: () => void;
   pendingCode: string | null;
+  notify: (text: string, kind?: Toast['kind']) => void;
 }
 
 const GameCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useGame = () => useContext(GameCtx);
 
 function serverUrl(): string {
+  // ?server=wss://... overrides the server (remembered on this phone) — handy for testing.
+  try {
+    const q = new URLSearchParams(location.search).get('server');
+    if (q === 'default') localStorage.removeItem('serverUrl');
+    else if (q && /^wss?:\/\//.test(q)) localStorage.setItem('serverUrl', q);
+    const saved = localStorage.getItem('serverUrl');
+    if (saved) return saved;
+  } catch {}
   const env = process.env.NEXT_PUBLIC_WS_URL;
   if (env) return env;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -71,6 +80,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const wantRejoin = useRef(true);
 
   useEffect(() => { profileRef.current = profile; }, [profile]);
+  useEffect(() => { setError(null); }, [state?.phase]);
   useEffect(() => { setSoundEnabled(state?.settings.announcements ?? true); }, [state?.settings.announcements]);
 
   useEffect(() => {
@@ -99,7 +109,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setFlash((f) => (f?.id === id ? null : f)), ms);
   }, []);
 
-  const nameOf = (id: unknown) => stateRef.current?.players.find((p) => p.id === id)?.name ?? 'Someone';
+  const nameOf = (id: unknown) => (id === stateRef.current?.you.id ? 'you' : stateRef.current?.players.find((p) => p.id === id)?.name ?? 'Someone');
+  const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
   const onEvent = useCallback((ev: EventName, d: Record<string, unknown> = {}) => {
     const st = stateRef.current;
@@ -109,27 +120,28 @@ export function GameProvider({ children }: { children: ReactNode }) {
       case 'player_joined': toast(`${d.name ?? nameOf(d.playerId)} joined`); break;
       case 'player_left': toast(`${d.name ?? nameOf(d.playerId)} left`); break;
       case 'player_kicked': toast(`${d.name ?? nameOf(d.playerId)} was kicked`, 'warn'); break;
-      case 'host_changed': toast(`${nameOf(d.playerId)} is now the host`); break;
-      case 'game_started': sfx.go(); say(me?.role === 'chaser' ? "You're a chaser" : "You're a runner. Go!"); break;
+      case 'host_changed': toast(cap(`${nameOf(d.playerId)} ${d.playerId === me?.id ? 'are' : 'is'} now the host`)); break;
+      // Roles are in the event itself; the state with new roles arrives right after.
+      case 'game_started': sfx.go(); buzz([200, 100, 200]); say((d.chaserIds as string[] | undefined)?.includes(me?.id ?? '') ? "You're a chaser" : "You're a runner. Go!"); break;
       case 'head_start_over': sfx.go(); toast('Ready or not, here they come!', 'warn'); say('Ready or not, here they come!'); break;
       case 'paused': toast('Game paused', 'warn'); say('Game paused'); break;
       case 'resumed': toast('Game resumed'); break;
       case 'locations_updated': sfx.ping(); toast(d.exact ? 'Exact locations updated' : 'Locations updated'); break;
-      case 'you_were_revealed': sfx.alarm(); doFlash('revealed', 'Your location was just sent to the chasers', 2500); break;
+      case 'you_were_revealed': sfx.alarm(); buzz([100, 60, 100]); doFlash('revealed', 'Your location was just sent to the chasers', 2500); break;
       case 'final_countdown': toast('Final countdown! Updates are faster', 'danger'); say('Final countdown'); break;
       case 'zone_shrinking': toast('The zone is shrinking!', 'warn'); say('The zone is shrinking'); break;
       case 'anti_camping': toast("Nobody's been caught. Exact locations next!", 'danger'); say('Exact locations next'); break;
       case 'time_warning': toast(`${d.minutesLeft} minute${d.minutesLeft === 1 ? '' : 's'} left`, 'warn'); say(`${d.minutesLeft} minute${d.minutesLeft === 1 ? '' : 's'} left`); break;
-      case 'out_of_zone': sfx.alarm(); break;
+      case 'out_of_zone': sfx.alarm(); buzz([400, 200, 400]); break;
       case 'back_in_zone': sfx.clear(); toast('Back in the zone'); break;
-      case 'revealed_for_leaving_zone': toast(`${nameOf(d.playerId)} left the zone. Location revealed!`, 'danger'); break;
-      case 'catch_request': if (d.runnerId === me?.id) sfx.alarm(); break;
-      case 'catch_disputed': toast(`${nameOf(d.runnerId)} disputed the catch`, 'warn'); break;
+      case 'revealed_for_leaving_zone': toast(cap(`${nameOf(d.playerId)} left the zone. Location revealed!`), 'danger'); break;
+      case 'catch_request': if (d.runnerId === me?.id) { sfx.alarm(); buzz([300, 100, 300, 100, 300]); } break;
+      case 'catch_disputed': toast(cap(`${nameOf(d.runnerId)} disputed the catch`), 'warn'); break;
       case 'catch_rejected': toast(`Too far (${Math.round(Number(d.distanceM))} m). Get closer`, 'warn'); break;
-      case 'player_caught': sfx.catch(); toast(`${nameOf(d.chaserId)} caught ${nameOf(d.runnerId)}!`, 'danger'); if (d.runnerId === me?.id) doFlash('caught', 'You were caught'); break;
-      case 'player_infected': toast(`${nameOf(d.playerId)} is infected!`, 'danger'); if (d.playerId === me?.id) doFlash('infected', "You're infected! You're a chaser now", 3500); break;
-      case 'player_jailed': toast(`${nameOf(d.playerId)} is in jail`, 'warn'); break;
-      case 'jailbreak': sfx.fanfare(); say('Jailbreak!'); doFlash('jailbreak', `JAILBREAK! ${nameOf(d.byId)} freed ${(d.freedIds as unknown[] | undefined)?.length ?? 0}`, 3500); break;
+      case 'player_caught': sfx.catch(); toast(cap(`${nameOf(d.chaserId)} caught ${nameOf(d.runnerId)}!`), 'danger'); if (d.runnerId === me?.id) doFlash('caught', 'You were caught'); break;
+      case 'player_infected': toast(d.playerId === me?.id ? "You're infected!" : `${nameOf(d.playerId)} is infected!`, 'danger'); if (d.playerId === me?.id) doFlash('infected', "You're infected! You're a chaser now", 3500); break;
+      case 'player_jailed': toast(d.playerId === me?.id ? "You're in jail" : `${nameOf(d.playerId)} is in jail`, 'warn'); break;
+      case 'jailbreak': sfx.fanfare(); say('Jailbreak!'); doFlash('jailbreak', `JAILBREAK! ${cap(nameOf(d.byId))} freed ${(d.freedIds as string[] | undefined)?.includes(me?.id ?? '') ? 'you' : (d.freedIds as unknown[] | undefined)?.length ?? 0}`, 3500); break;
       case 'game_over': sfx.fanfare(); break;
       default: break;
     }
@@ -152,12 +164,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sock.onmessage = (e) => {
         const msg = JSON.parse(e.data as string) as ServerMessage;
         switch (msg.type) {
-          case 'joined': sessionRef.current = { code: msg.code, playerId: msg.playerId, token: msg.token }; lsSet('session', sessionRef.current); break;
+          case 'joined':
+            sessionRef.current = { code: msg.code, playerId: msg.playerId, token: msg.token }; lsSet('session', sessionRef.current);
+            wantRejoin.current = true; // a dropped connection should put us back in this game
+            break;
           case 'state': stateRef.current = msg.state; setState(msg.state); break;
           case 'event': onEvent(msg.event, msg.data); break;
           case 'error':
             if (msg.code === 'no_game' || msg.code === 'bad_rejoin') { sessionRef.current = null; lsDel('session'); stateRef.current = null; setState(null); }
-            if (msg.code === 'no_game' && !stateRef.current) setError(msg.message); else if (msg.code !== 'bad_rejoin') setError(msg.message);
+            if (msg.code === 'bad_rejoin' || msg.code === 'too_far') break; // too_far is already shown via the catch_rejected event
+            // During a game, errors are momentary: show a toast. In menus, show a banner until dismissed.
+            if (stateRef.current && stateRef.current.phase !== 'lobby') toast(msg.message, 'warn'); else setError(msg.message);
             break;
           case 'kicked': sessionRef.current = null; lsDel('session'); stateRef.current = null; setState(null); setKicked(true); break;
         }
@@ -170,19 +187,32 @@ export function GameProvider({ children }: { children: ReactNode }) {
     };
     connect();
     return () => { closed = true; clearTimeout(timer); clearTimeout(wakeTimer); clearInterval(pinger); ws.current?.close(); };
-  }, [onEvent]);
+  }, [onEvent, toast]);
 
   // ----- Geolocation -----
+  const lastFix = useRef<{ lat: number; lng: number; accuracy: number; heading: number | null } | null>(null);
+  const sendFix = useCallback(() => {
+    const f = lastFix.current;
+    if (!f || !stateRef.current || ws.current?.readyState !== 1) return; // only while in a game
+    lastSent.current = Date.now();
+    ws.current.send(JSON.stringify({ type: 'location', ...f }));
+  }, []);
+  // Phones stop reporting GPS when you stand still. Re-send the last fix every few seconds so a
+  // hiding runner still counts as "here" for heartbeat, catches and jailbreaks.
+  useEffect(() => {
+    const id = setInterval(() => { if (Date.now() - lastSent.current > 4000) sendFix(); }, 2000);
+    return () => clearInterval(id);
+  }, [sendFix]);
+
   const startGeo = useCallback(() => {
     if (watchId.current != null || !('geolocation' in navigator)) return;
     watchId.current = navigator.geolocation.watchPosition(
       (pos) => {
         setAccuracy(pos.coords.accuracy);
         setGeo(pos.coords.accuracy > 30 ? 'weak' : 'ok');
-        const now = Date.now();
-        if (now - lastSent.current < 900) return;
-        lastSent.current = now;
-        ws.current?.readyState === 1 && ws.current.send(JSON.stringify({ type: 'location', lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, heading: pos.coords.heading }));
+        lastFix.current = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, heading: pos.coords.heading };
+        if (Date.now() - lastSent.current < 900) return;
+        sendFix();
       },
       (err) => { if (err.code === err.PERMISSION_DENIED) setGeo('denied'); else setGeo('weak'); },
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 },
@@ -244,8 +274,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     conn, waking, state, profile, setProfile, send, createGame, joinGame, leave,
     error, clearError: () => setError(null), toasts, flash, clearFlash: () => setFlash(null),
-    geo, accuracy, ready, makeReady, heading, kicked, clearKicked: () => setKicked(false), pendingCode,
-  }), [conn, waking, state, profile, setProfile, send, createGame, joinGame, leave, error, toasts, flash, geo, accuracy, ready, makeReady, heading, kicked, pendingCode]);
+    geo, accuracy, ready, makeReady, heading, kicked, clearKicked: () => setKicked(false), pendingCode, notify: toast,
+  }), [toast, conn, waking, state, profile, setProfile, send, createGame, joinGame, leave, error, toasts, flash, geo, accuracy, ready, makeReady, heading, kicked, pendingCode]);
 
   return <GameCtx.Provider value={value}>{children}</GameCtx.Provider>;
 }

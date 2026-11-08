@@ -179,3 +179,17 @@ test('shrinking zone gets smaller over the game', () => {
   advance(300);
   assert.equal(Math.round(game.zoneRadius()), 150);
 });
+
+test('walking distance is counted even with small 1-second steps', () => {
+  const { game, host, players, advance } = setup(2, { headStart: { enabled: false, seconds: 10 } });
+  game.handle(host.id, { type: 'start_game' });
+  const p = players[1];
+  for (let i = 0; i <= 100; i++) {
+    const pt = offsetPoint(CENTER, i * 1.4, 90); // walking pace, one update per second
+    game.handle(p.id, { type: 'location', lat: pt.lat, lng: pt.lng, accuracy: 8 });
+    advance(1);
+  }
+  game.handle(host.id, { type: 'end_game' });
+  const d = game.stateFor(p.id).results!.players.find(x => x.playerId === p.id)!.distanceM;
+  assert.ok(d >= 125 && d <= 145, `expected ~140 m, got ${d}`);
+});

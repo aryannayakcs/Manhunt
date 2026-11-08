@@ -18,7 +18,8 @@ input{outline:none}
 .scr.scroll{overflow-y:auto}
 .scr.runner{--accent:var(--runner)}
 .scr.chaser{--accent:var(--chaser)}
-.scr.dim{filter:brightness(.55) saturate(.8)}
+/* stealth: dim the runner's screen so it doesn't light up their hiding spot, but keep warnings bright */
+.scr.dim>:not(.take):not(.vig){filter:brightness(.6) saturate(.8)}
 .disp{font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.03em;line-height:.95}
 .timer{font:800 84px var(--mono);letter-spacing:-.04em;line-height:1;text-align:center}
 .timer.sm{font-size:30px}
@@ -115,7 +116,7 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 @keyframes pop{from{transform:scale(.6);opacity:0}}
 .pulse{animation:pls 1.2s infinite}
 @keyframes pls{50%{opacity:.55}}
-.toasts{position:absolute;top:calc(env(safe-area-inset-top) + 8px);left:12px;right:12px;z-index:60;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.toasts{position:absolute;top:calc(env(safe-area-inset-top) + 66px);left:12px;right:12px;z-index:60;display:flex;flex-direction:column;gap:6px;pointer-events:none}
 .toast{background:var(--s3);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:14px;font-weight:600;animation:fadein .2s}
 .toast.warn{background:#3a2c07;color:var(--warn);border-color:transparent}
 .toast.danger{background:var(--danger-d);color:var(--danger);border-color:transparent}
@@ -138,3 +139,7 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 .mk i.none{display:none}
 .top{padding-right:var(--hostpad,0)}
 .sheet{position:absolute;inset:0;z-index:35;background:#000d;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:20px 20px calc(env(safe-area-inset-bottom) + 20px)}
+
+/* buttons side by side share the row instead of overflowing it */
+.row>.btn{width:auto;flex:1 1 0;min-width:0;padding:0 8px}
+.player[disabled]{opacity:.45}

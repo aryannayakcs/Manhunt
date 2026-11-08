@@ -43,7 +43,7 @@ function LobbyWithProfile({ s }: { s: GameState }) {
 }
 
 function Game({ s }: { s: GameState }) {
-  const { geo } = useGame();
+  const { geo, ready, makeReady } = useGame();
   const phase = s.phase === 'paused' ? s.pausedFrom ?? 'active' : s.phase;
   const headStart = phase === 'headstart';
   const [reveal, setReveal] = useState(false);
@@ -59,6 +59,7 @@ function Game({ s }: { s: GameState }) {
   }, [phase, key]);
   useEffect(() => { if (phase === 'lobby') seen.current = null; }, [phase]);
 
+  const hideReveal = useCallback(() => setReveal(false), []);
   const me = s.you;
   let view;
   if (me.status === 'jailed') view = <JailedView s={s} />;
@@ -69,9 +70,14 @@ function Game({ s }: { s: GameState }) {
   return (
     <>
       {view}
-      {reveal && <RoleReveal role={me.role} headStartSec={s.timers.headStartLeftSec} onDone={() => setReveal(false)} />}
+      {reveal && <RoleReveal role={me.role} headStartSec={s.timers.headStartLeftSec} onDone={hideReveal} />}
       {s.phase === 'paused' && <Paused s={s} />}
       {me.isHost && <HostMenu s={s} />}
+      {!ready && (
+        <button className="sysbar" style={{ pointerEvents: 'auto', bottom: 'auto', top: 'calc(env(safe-area-inset-top) + 66px)', zIndex: 66 }} onClick={() => void makeReady()}>
+          <div className="banner warn" style={{ justifyContent: 'center' }}>🔈 Tap to turn sound &amp; keep-awake back on</div>
+        </button>
+      )}
       {geo === 'denied' && <div className="sysbar"><div className="banner danger">📍 Location is off. Turn it on or the game can&apos;t track you.</div></div>}
     </>
   );

@@ -34,6 +34,11 @@ export const sfx = {
   go() { if (enabled) { tone(440, 0.2, 0.3, 'square'); tone(880, 0.4, 0.3, 'square', 0.22); } },
 };
 
+/** Vibrate (Android only; iPhone browsers ignore this). Not tied to the sound setting: it's silent. */
+export function buzz(pattern: number | number[]) {
+  try { navigator.vibrate?.(pattern); } catch {}
+}
+
 export function speak(text: string) {
   if (!enabled || typeof speechSynthesis === 'undefined') return;
   try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; speechSynthesis.speak(u); } catch {}

@@ -1,0 +1,14 @@
+# Render blueprint for the game server (free tier).
+# On render.com: New → Blueprint → pick this repo → Apply.
+services:
+  - type: web
+    name: manhunt-server
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"

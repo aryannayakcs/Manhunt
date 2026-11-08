@@ -98,7 +98,10 @@ wss.on('connection', (ws) => {
           return;
         }
         default: {
-          if (!s.game || !s.playerId) throw new GameError('not_in_game', 'Join a game first.');
+          if (!s.game || !s.playerId) {
+            if (msg.type === 'location') return; // phones send GPS before (re)joining; just ignore it
+            throw new GameError('not_in_game', 'Join a game first.');
+          }
           if (msg.type === 'location') {
             const now = Date.now();
             if (now - s.lastLocationAt < LOCATION_MIN_GAP_MS) return;

@@ -24,18 +24,9 @@ export interface MapProps {
   draggable?: LatLng | null;
 }
 
-const STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    base: {
-      type: 'raster', tileSize: 256, maxzoom: 19,
-      // Override with NEXT_PUBLIC_TILE_URL (e.g. a MapTiler / Stadia dark style with your key).
-      tiles: process.env.NEXT_PUBLIC_TILE_URL ? [process.env.NEXT_PUBLIC_TILE_URL] : ['a', 'b', 'c', 'd'].map((s) => `https://${s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png`),
-      attribution: '© OpenStreetMap © CARTO',
-    },
-  },
-  layers: [{ id: 'base', type: 'raster', source: 'base' }],
-};
+// Free dark vector map, no API key or usage limits (openfreemap.org).
+// Override with NEXT_PUBLIC_MAP_STYLE (any MapLibre style URL) if you want a different look.
+const STYLE = process.env.NEXT_PUBLIC_MAP_STYLE || 'https://tiles.openfreemap.org/styles/dark';
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 function mkEl(m: Mk): HTMLElement {
@@ -63,8 +54,11 @@ export default function MapView(p: MapProps) {
     const m = new maplibregl.Map({
       container: box.current, style: STYLE, center: [c.lng, c.lat], zoom: p.zone?.center || p.follow ? 16 : 2,
       attributionControl: { compact: true }, pitchWithRotate: false, dragRotate: false,
+      // Dev only: lets screenshots capture the map canvas.
+      preserveDrawingBuffer: process.env.NODE_ENV !== 'production',
     });
     map.current = m;
+    if (process.env.NODE_ENV !== 'production') (window as unknown as { __maps?: MLMap[] }).__maps = [...((window as unknown as { __maps?: MLMap[] }).__maps ?? []), m];
     m.on('load', () => {
       m.addSource('zone', { type: 'geojson', data: EMPTY });
       m.addSource('final', { type: 'geojson', data: EMPTY });
@@ -100,7 +94,8 @@ export default function MapView(p: MapProps) {
 
     // markers
     const seen = new Set<string>();
-    for (const k of pr.markers ?? []) {
+    const jailMk: Mk[] = pr.jail ? [{ id: '__jail', lat: pr.jail.location.lat, lng: pr.jail.location.lng, color: '#ffb020', kind: 'label', label: '⛓ JAIL' }] : [];
+    for (const k of [...jailMk, ...(pr.markers ?? [])]) {
       if (k.hidden) continue;
       seen.add(k.id);
       let mk = mks.current.get(k.id);
@@ -138,5 +133,5 @@ export default function MapView(p: MapProps) {
   }
   useEffect(sync);
 
-  return <div className="mapbox" style={p.dim ? { filter: 'brightness(.6)' } : undefined}><div ref={box} /></div>;
+  return <div className="mapbox"><div ref={box} /></div>;
 }

@@ -283,7 +283,7 @@ const arrowRotation = (state.you.compassBearing - deviceHeading + 360) % 360; //
 ## 8. Things that will bite you
 
 - **HTTPS is required for GPS on phones.** `http://192.168.x.x:3000` won't get location. To test on real phones, deploy (Vercel gives you HTTPS) or use a tunnel like `cloudflared tunnel --url http://localhost:3000`.
-- **Maps:** MapLibre GL or Leaflet with OpenStreetMap tiles are free. For circles, Leaflet has `L.circle(center, { radius })`, which takes meters.
+- **Maps:** the app uses MapLibre GL with the free OpenFreeMap dark style (no API key). CARTO tiles now need a key. For circles, Leaflet has `L.circle(center, { radius })`, which takes meters.
 - **Screen lock kills location.** Use the wake lock, tell players to keep the app open, and suggest turning brightness down.
 - **Big tap targets:** people use this while running, at night. Use large buttons, high contrast and a dark theme.
 
