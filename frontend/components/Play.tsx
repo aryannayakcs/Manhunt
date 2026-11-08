@@ -12,7 +12,7 @@ const youMk = (s: GameState, color: string): Mk[] => (s.you.location ? [{ id: 'y
 /** Chasers the server lets this player see (other chasers, or everyone when runners may see chasers). */
 const chaserMks = (s: GameState): Mk[] => s.map.chasers.filter((c) => c.playerId !== s.you.id).map((c) => {
   const p = byId(s, c.playerId);
-  return { id: `c-${c.playerId}`, lat: c.lat, lng: c.lng, color: p?.color ?? '#ff5a2c', kind: 'tri', label: p?.name };
+  return { id: `c-${c.playerId}`, lat: c.lat, lng: c.lng, color: p?.color ?? '#ff5a2c', kind: 'tri', label: p?.name, sub: c.ageSec != null ? fmtAge(c.ageSec) : undefined };
 });
 const freeRunners = (s: GameState) => s.players.filter((p) => p.role === 'runner' && p.status === 'free');
 
@@ -173,6 +173,7 @@ export function RunnerView({ s, headStart }: { s: GameState; headStart: boolean 
         <div className="timer sm" style={{ color: 'var(--runner)' }}>{headStart ? fmtTime(t.headStartLeftSec) : fmtTime(t.gameLeftSec)}</div>
         <div className="row">
           {me && me.immuneSec > 0 && <span className="badge">🛡 Immune {Math.ceil(me.immuneSec)} s</span>}
+          {t.chaserRevealInSec != null && <span className="pill"><small>Chasers</small>{s.map.chasers.length ? 'NOW' : fmtTime(t.chaserRevealInSec)}</span>}
           <span className="pill"><small>Free</small>{free}</span>
         </div>
       </div>

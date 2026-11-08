@@ -4,7 +4,7 @@ import { Game, GameError } from './game.ts';
 import { ClientMessageSchema, type ServerMessage } from './protocol.ts';
 
 const PORT = Number(process.env.PORT ?? 8080);
-const VERSION = '2026-11-07e'; // bump when deploying, so /health shows which code is live
+const VERSION = '2026-11-07f'; // bump when deploying, so /health shows which code is live
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O
 const EMPTY_GAME_TTL_MS = 30 * 60_000; // delete games with nobody connected after 30 min
 const LOCATION_MIN_GAP_MS = 500;

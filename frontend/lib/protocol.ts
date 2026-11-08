@@ -8,7 +8,7 @@ export interface Settings {
   chasers: { count: number; selection: 'random' | 'host' };
   durationMin: number;
   headStart: { enabled: boolean; seconds: number };
-  locationUpdates: { mode: 'interval' | 'live' | 'off'; intervalSec: number };
+  locationUpdates: { mode: 'interval' | 'live' | 'off'; intervalSec: number; showSec: number };
   fuzzy: { enabled: boolean; radiusM: number };
   finalCountdown: { enabled: boolean; lastMin: number; intervalSec: number };
   heartbeat: { enabled: boolean; distancesM: [number, number, number] };
@@ -18,7 +18,7 @@ export interface Settings {
   jail: { location: LatLng | null; radiusM: number; holdSec: number; immunitySec: number };
   runnerView: 'map' | 'none';
   announcements: boolean;
-  visibility: { runnersSeeChasers: boolean; chasersSeeChasers: boolean };
+  visibility: { runnersSeeChasers: boolean; chaserUpdates: 'interval' | 'live'; chaserIntervalSec: number; chaserShowSec: number; chasersSeeChasers: boolean };
   antiCamping: { enabled: boolean; afterMin: number };
   outOfZone: { graceSec: number };
   catching: { radiusM: number; autoAcceptSec: number; auto: boolean; autoRadiusM: number; autoHoldSec: number };
@@ -32,7 +32,7 @@ export interface RunnerMarker {
   playerId: string; lat: number; lng: number; radiusM: number; exact: boolean;
   reason: 'scheduled' | 'live' | 'out_of_zone' | 'anti_camping' | 'signal_lost'; ageSec: number;
 }
-export interface LiveMarker { playerId: string; lat: number; lng: number; accuracy: number }
+export interface LiveMarker { playerId: string; lat: number; lng: number; accuracy: number; /** snapshot age, when not live */ ageSec?: number }
 export interface PendingCatch { catchId: string; chaserId: string; runnerId: string; autoAcceptInSec: number }
 
 export interface Results {
@@ -61,7 +61,7 @@ export interface GameState {
     nextRadiusM: number | null; nextShrinkInSec: number | null; stage: number | null; stages: number | null;
   };
   jail: { location: LatLng; radiusM: number } | null;
-  timers: { headStartLeftSec: number | null; gameLeftSec: number | null; nextUpdateInSec: number | null; finalCountdownActive: boolean };
+  timers: { headStartLeftSec: number | null; gameLeftSec: number | null; nextUpdateInSec: number | null; chaserRevealInSec: number | null; finalCountdownActive: boolean };
   map: { runners: RunnerMarker[]; chasers: LiveMarker[]; everyone: LiveMarker[] };
   pendingCatch: PendingCatch | null;
   results: Results | null;
@@ -70,7 +70,7 @@ export interface GameState {
 export type EventName =
   | 'player_joined' | 'player_left' | 'player_kicked' | 'host_changed'
   | 'game_started' | 'head_start_over' | 'paused' | 'resumed'
-  | 'locations_updated' | 'you_were_revealed' | 'final_countdown' | 'zone_shrinking' | 'anti_camping'
+  | 'locations_updated' | 'you_were_revealed' | 'chasers_revealed' | 'final_countdown' | 'zone_shrinking' | 'anti_camping'
   | 'time_warning' | 'out_of_zone' | 'back_in_zone' | 'revealed_for_leaving_zone' | 'signal_lost'
   | 'catch_request' | 'catch_disputed' | 'catch_rejected'
   | 'player_caught' | 'player_infected' | 'player_jailed' | 'jailbreak'

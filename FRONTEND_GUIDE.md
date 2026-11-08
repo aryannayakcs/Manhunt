@@ -179,6 +179,7 @@ If a value is out of range, you get `error` with code `bad_settings`, and the se
 | Head start length | `headStart.seconds` | slider | 10–1800 s | 180 |
 | Location updates | `locationUpdates.mode` | `interval` / `live` / `off` | | `interval` |
 | Update every | `locationUpdates.intervalSec` | slider | 10–1800 s | 120 |
+| Chasers see each update for | `locationUpdates.showSec` | slider | 0 (until the next update) – interval | 0 |
 | Fuzzy updates | `fuzzy.enabled` | switch | | on |
 | Fuzzy circle size | `fuzzy.radiusM` | slider | 10–500 m | 60 |
 | Final countdown | `finalCountdown.enabled` | switch | | on |
@@ -201,6 +202,9 @@ If a value is out of range, you get `error` with code `bad_settings`, and the se
 | Immunity after jailbreak | `jail.immunitySec` | slider | 0–120 s | 10 |
 | What runners see | `runnerView` | `map` / `none` (runners are never told a chaser's direction) | | `map` |
 | Runners see chasers | `visibility.runnersSeeChasers` | switch (live chaser positions on the runner map; needs `map`) | | off |
+| …how | `visibility.chaserUpdates` | `interval` (snapshot every X) / `live` | | `interval` |
+| …every | `visibility.chaserIntervalSec` | slider | 10–1800 s | 60 |
+| …shown for | `visibility.chaserShowSec` | slider | 0 (until the next one) – interval | 15 |
 | Chasers see each other | `visibility.chasersSeeChasers` | switch | | on |
 | Sounds & announcements | `announcements` | switch | | on |
 | Anti-camping | `antiCamping.enabled` | switch | | off |
@@ -230,6 +234,7 @@ Events are one-off moments. Play a sound or voice line and show a toast. Only pl
 | `head_start_over` | all | | "Ready or not, here they come!" |
 | `paused` / `resumed` | all | | "Game paused" |
 | `locations_updated` | chasers, spectators | `exact` | ping sound + "Locations updated" |
+| `chasers_revealed` | runners | `showSec` | "Chasers revealed for 15 s. Check your map!" |
 | `you_were_revealed` | free runners | `exact` | "Your location was sent!" |
 | `final_countdown` | all | `minutesLeft` | "Final countdown! Updates are faster" |
 | `zone_shrinking` | all | `toRadiusM, stage, stages` | "The zone is shrinking! (2 of 3)" |

@@ -196,6 +196,7 @@ function Settings({ s, back, openZone }: { s: GameState; back: () => void; openZ
         <div className="card">
           <Seg value={st.locationUpdates.mode} opts={[['interval', 'Every X'], ['live', 'Live'], ['off', 'Off']]} set={(v) => up({ locationUpdates: { mode: v } })} />
           {st.locationUpdates.mode === 'interval' && <Slider label="Update every" value={st.locationUpdates.intervalSec} min={10} max={1800} step={10} fmt={sec} set={(v) => up({ locationUpdates: { intervalSec: v } })} />}
+          {st.locationUpdates.mode === 'interval' && <Slider label="Chasers see each update for" value={Math.min(st.locationUpdates.showSec, st.locationUpdates.intervalSec)} min={0} max={st.locationUpdates.intervalSec} step={5} fmt={(v) => (v === 0 ? 'until the next one' : sec(v))} set={(v) => up({ locationUpdates: { showSec: v } })} />}
           {st.locationUpdates.mode === 'interval' && (
             <>
               <Row label="Fuzzy updates"><Switch on={st.fuzzy.enabled} set={(v) => up({ fuzzy: { enabled: v } })} /></Row>
@@ -219,9 +220,20 @@ function Settings({ s, back, openZone }: { s: GameState; back: () => void; openZ
 
         <div className="lbl">Who can see chasers</div>
         <div className="card">
-          <Row label={<span>Runners see chasers<br /><small className="mut">Live, on the runner&apos;s map{st.runnerView === 'none' ? ' (needs “Their map”)' : ''}</small></span>}>
+          <Row label={<span>Runners see chasers<br /><small className="mut">On the runner&apos;s map{st.runnerView === 'none' ? ' (needs “Their map”)' : ''}</small></span>}>
             <Switch on={st.visibility.runnersSeeChasers} set={(v) => up({ visibility: { runnersSeeChasers: v }, ...(v && st.runnerView === 'none' ? { runnerView: 'map' } : {}) })} />
           </Row>
+          {st.visibility.runnersSeeChasers && (
+            <>
+              <Seg value={st.visibility.chaserUpdates} opts={[['interval', 'Every X'], ['live', 'Live']]} set={(v) => up({ visibility: { chaserUpdates: v } })} />
+              {st.visibility.chaserUpdates === 'interval' && (
+                <>
+                  <Slider label="Show runners the chasers every" value={st.visibility.chaserIntervalSec} min={10} max={1800} step={10} fmt={sec} set={(v) => up({ visibility: { chaserIntervalSec: v } })} />
+                  <Slider label="Keep them on screen for" value={Math.min(st.visibility.chaserShowSec, st.visibility.chaserIntervalSec)} min={0} max={st.visibility.chaserIntervalSec} step={5} fmt={(v) => (v === 0 ? 'until the next one' : sec(v))} set={(v) => up({ visibility: { chaserShowSec: v } })} />
+                </>
+              )}
+            </>
+          )}
           <Row label={<span>Chasers see each other<br /><small className="mut">Teammates on the chaser map</small></span>}>
             <Switch on={st.visibility.chasersSeeChasers} set={(v) => up({ visibility: { chasersSeeChasers: v } })} />
           </Row>

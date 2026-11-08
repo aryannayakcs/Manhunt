@@ -82,6 +82,9 @@ export class Game {
   private endedElapsed: number | null = null;
 
   private nextRevealAt: number | null = null;
+  /** Snapshots of chaser positions shown to runners (when runners see chasers on a timer). */
+  private chaserReveals = new Map<string, { lat: number; lng: number; accuracy: number; at: number }>();
+  private nextChaserRevealAt: number | null = null;
   private lastCatchAt = 0;
   private reveals = new Map<string, Reveal>();
   private pending = new Map<string, Pending>();
@@ -324,6 +327,9 @@ export class Game {
     const e = this.elapsed();
     this.lastCatchAt = e;
     this.nextRevealAt = this.settings.locationUpdates.mode === 'interval' ? e + this.revealIntervalMs() : null;
+    const v = this.settings.visibility;
+    this.chaserReveals.clear();
+    this.nextChaserRevealAt = v.runnersSeeChasers && v.chaserUpdates === 'interval' ? e + v.chaserIntervalSec * 1000 : null;
   }
 
   private pause() {
@@ -395,6 +401,7 @@ export class Game {
     if (this.phase === 'active') {
       this.announcements(e);
       this.doReveals(e);
+      this.doChaserReveals(e);
       this.checkJailbreak(e);
       this.checkAutoCatch(e);
       this.trackClosestCalls();
@@ -499,6 +506,17 @@ export class Game {
     this.nextRevealAt = e + this.revealIntervalMs();
     this.emit('locations_updated', { exact }, this.ids(q => q.role === 'chaser' || q.status === 'out'));
     this.emit('you_were_revealed', { exact }, runners.map(p => p.id));
+  }
+
+  /** Runners see chasers on a timer: snapshot every chaser's position. */
+  private doChaserReveals(e: number) {
+    if (this.nextChaserRevealAt === null || e < this.nextChaserRevealAt) return;
+    const v = this.settings.visibility;
+    for (const c of this.players.values()) {
+      if (c.role === 'chaser' && c.loc) this.chaserReveals.set(c.id, { lat: c.loc.lat, lng: c.loc.lng, accuracy: c.loc.accuracy, at: e });
+    }
+    this.nextChaserRevealAt = e + v.chaserIntervalSec * 1000;
+    this.emit('chasers_revealed', { showSec: v.chaserShowSec }, this.ids(q => q.role === 'runner' && q.status !== 'out'));
   }
 
   private reveal(p: Player, exact: boolean, reason: Reveal['reason'], e: number) {
@@ -698,14 +716,19 @@ export class Game {
     }
 
     const runners: RunnerMarker[] = [];
+    const showMs = this.settings.locationUpdates.showSec * 1000;
     if (chaserView || spectator) {
       for (const [id, r] of this.reveals) {
         const p = this.players.get(id);
         if (!p || p.role !== 'runner' || p.status !== 'free') continue;
+        // "Show each update for N s": scheduled updates disappear from chasers' maps after N s.
+        if (!spectator && showMs > 0 && (r.reason === 'scheduled' || r.reason === 'anti_camping') && e - r.at >= showMs) continue;
         runners.push({ playerId: id, lat: r.lat, lng: r.lng, radiusM: r.radiusM, exact: r.exact, reason: r.reason, ageSec: Math.round((e - r.at) / 1000) });
       }
     }
     const all = [...this.players.values()];
+    const vis = this.settings.visibility;
+    const runnerSeesChasers = playing && me.role === 'runner' && me.status !== 'out' && this.settings.runnerView === 'map' && vis.runnersSeeChasers;
     const jail = this.jailLocation();
     const pc = [...this.pending.values()].find(x => x.runnerId === me.id || x.chaserId === me.id);
     const sz = this.settings.shrinkingZone;
@@ -749,15 +772,17 @@ export class Game {
         headStartLeftSec: ph === 'headstart' ? Math.max(0, Math.ceil((this.headStartMs - e) / 1000)) : null,
         gameLeftSec: playing ? Math.max(0, Math.ceil((this.endAt - Math.max(e, this.headStartMs)) / 1000)) : null,
         nextUpdateInSec: ph === 'active' && this.nextRevealAt !== null ? Math.max(0, Math.ceil((this.nextRevealAt - e) / 1000)) : null,
+        chaserRevealInSec: ph === 'active' && runnerSeesChasers && this.nextChaserRevealAt !== null ? Math.max(0, Math.ceil((this.nextChaserRevealAt - e) / 1000)) : null,
         finalCountdownActive: this.finalCountdownActive(),
       },
       map: {
         runners,
-        chasers: all.filter(p => p.role === 'chaser' && (
-          spectator
-          || (chaserView && (p.id === me.id || this.settings.visibility.chasersSeeChasers))
-          || (playing && me.role === 'runner' && me.status !== 'out' && this.settings.runnerView === 'map' && this.settings.visibility.runnersSeeChasers)
-        )).map(live).filter(x => x !== null),
+        chasers: spectator || chaserView
+          ? all.filter(p => p.role === 'chaser' && (spectator || p.id === me.id || vis.chasersSeeChasers)).map(live).filter(x => x !== null)
+          : !runnerSeesChasers ? []
+          : vis.chaserUpdates === 'live' ? all.filter(p => p.role === 'chaser').map(live).filter(x => x !== null)
+          : [...this.chaserReveals].filter(([id, r]) => this.players.get(id)?.role === 'chaser' && (vis.chaserShowSec === 0 || e - r.at < vis.chaserShowSec * 1000))
+              .map(([id, r]) => ({ playerId: id, lat: r.lat, lng: r.lng, accuracy: Math.round(r.accuracy), ageSec: Math.round((e - r.at) / 1000) })),
         everyone: spectator ? all.map(live).filter(x => x !== null) : [],
       },
       pendingCatch: pc ? {

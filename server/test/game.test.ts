@@ -225,7 +225,7 @@ test('who can see chasers: runners (off by default) and chasers (on by default)'
   // settings can only change in the lobby: end, change, start again
   game.handle(host.id, { type: 'end_game' });
   game.handle(host.id, { type: 'rematch' });
-  game.handle(host.id, { type: 'update_settings', settings: { chasers: { count: 2, selection: 'random' }, visibility: { runnersSeeChasers: true, chasersSeeChasers: false } } });
+  game.handle(host.id, { type: 'update_settings', settings: { chasers: { count: 2, selection: 'random' }, visibility: { runnersSeeChasers: true, chaserUpdates: 'live', chasersSeeChasers: false } } });
   game.handle(host.id, { type: 'start_game' });
   const { chasers: [d1, d2], runners: [r2] } = roles();
   at(d1.id, 0); at(d2.id, 50); at(r2.id, 100);
@@ -292,4 +292,39 @@ test('auto-catch is off by default', () => {
   const { chasers: [c], runners: [r] } = roles();
   for (let i = 0; i < 5; i++) { at(c.id, 0); at(r.id, 1); advance(1); }
   assert.equal(r.status, 'free');
+});
+
+test('runners see chasers on a timer, each snapshot shown for a set time', () => {
+  const { game, host, at, advance, roles, events } = setup(3, { headStart: { enabled: false, seconds: 10 },
+    visibility: { runnersSeeChasers: true, chaserUpdates: 'interval', chaserIntervalSec: 60, chaserShowSec: 15, chasersSeeChasers: true } });
+  game.handle(host.id, { type: 'start_game' });
+  const { chasers: [c], runners: [r] } = roles();
+  const tick = (n: number) => { for (let i = 0; i < n; i++) { at(c.id, 0); at(r.id, 100); advance(1); } };
+  tick(1);
+  assert.equal(game.stateFor(r.id).map.chasers.length, 0, 'nothing before the first snapshot');
+  assert.equal(game.stateFor(r.id).timers.chaserRevealInSec, 59);
+  tick(59);
+  const snap = game.stateFor(r.id).map.chasers;
+  assert.equal(snap.length, 1, 'snapshot at 60 s');
+  assert.equal(snap[0].ageSec, 0);
+  assert.ok(events(r.id).includes('chasers_revealed'));
+  tick(14);
+  assert.equal(game.stateFor(r.id).map.chasers.length, 1, 'still shown at 14 s');
+  tick(1);
+  assert.equal(game.stateFor(r.id).map.chasers.length, 0, 'gone after 15 s');
+  assert.equal(game.stateFor(r.id).timers.chaserRevealInSec, 45);
+});
+
+test('chasers: each runner update can disappear after a set time', () => {
+  const { game, host, at, advance, roles } = setup(2, { headStart: { enabled: false, seconds: 10 },
+    locationUpdates: { mode: 'interval', intervalSec: 60, showSec: 10 } });
+  game.handle(host.id, { type: 'start_game' });
+  const { chasers: [c], runners: [r] } = roles();
+  const tick = (n: number) => { for (let i = 0; i < n; i++) { at(c.id, 0); at(r.id, 100); advance(1); } };
+  tick(60);
+  assert.equal(game.stateFor(c.id).map.runners.length, 1, 'update shown');
+  tick(9);
+  assert.equal(game.stateFor(c.id).map.runners.length, 1);
+  tick(1);
+  assert.equal(game.stateFor(c.id).map.runners.length, 0, 'hidden after 10 s');
 });

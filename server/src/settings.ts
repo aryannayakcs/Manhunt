@@ -27,6 +27,8 @@ export const SettingsSchema = z.object({
   locationUpdates: z.object({
     mode: z.enum(['interval', 'live', 'off']),
     intervalSec: z.number().int().min(10).max(1800),
+    /** How long each scheduled update stays on the chasers' map, in seconds. 0 = until the next update. */
+    showSec: z.number().int().min(0).max(1800),
   }),
   /** Scheduled updates show a circle the runner is somewhere inside instead of an exact dot. */
   fuzzy: z.object({
@@ -83,6 +85,12 @@ export const SettingsSchema = z.object({
   visibility: z.object({
     /** Runners see where chasers are (needs runnerView = map). */
     runnersSeeChasers: z.boolean(),
+    /** live: runners see chasers move in real time. interval: a snapshot every chaserIntervalSec. */
+    chaserUpdates: z.enum(['interval', 'live']),
+    /** interval: how often runners get a snapshot of the chasers. */
+    chaserIntervalSec: z.number().int().min(10).max(1800),
+    /** interval: how long each snapshot stays on the runners' map. 0 = until the next one. */
+    chaserShowSec: z.number().int().min(0).max(1800),
     /** Chasers see their teammates. */
     chasersSeeChasers: z.boolean(),
   }),
@@ -114,7 +122,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chasers: { count: 1, selection: 'random' },
   durationMin: 20,
   headStart: { enabled: true, seconds: 180 },
-  locationUpdates: { mode: 'interval', intervalSec: 120 },
+  locationUpdates: { mode: 'interval', intervalSec: 120, showSec: 0 },
   fuzzy: { enabled: true, radiusM: 60 },
   finalCountdown: { enabled: true, lastMin: 3, intervalSec: 30 },
   heartbeat: { enabled: true, distancesM: [80, 50, 25] },
@@ -124,7 +132,7 @@ export const DEFAULT_SETTINGS: Settings = {
   jail: { location: null, radiusM: 15, holdSec: 5, immunitySec: 10 },
   runnerView: 'map',
   announcements: true,
-  visibility: { runnersSeeChasers: false, chasersSeeChasers: true },
+  visibility: { runnersSeeChasers: false, chaserUpdates: 'interval', chaserIntervalSec: 60, chaserShowSec: 15, chasersSeeChasers: true },
   antiCamping: { enabled: false, afterMin: 6 },
   outOfZone: { graceSec: 15 },
   catching: { radiusM: 15, autoAcceptSec: 15, auto: false, autoRadiusM: 5, autoHoldSec: 2 },

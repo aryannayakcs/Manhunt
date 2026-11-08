@@ -84,6 +84,8 @@ export interface LiveMarker {
   lat: number;
   lng: number;
   accuracy: number;
+  /** Set when this is a snapshot rather than live: seconds since it was taken. */
+  ageSec?: number;
 }
 
 export interface PendingCatch {
@@ -169,6 +171,8 @@ export interface GameState {
     gameLeftSec: number | null;
     /** Seconds until the next scheduled location update for chasers. */
     nextUpdateInSec: number | null;
+    /** Runners, when chasers are revealed on a timer: seconds until the next snapshot. */
+    chaserRevealInSec: number | null;
     finalCountdownActive: boolean;
   };
   map: {
@@ -187,7 +191,7 @@ export interface GameState {
 export type EventName =
   | 'player_joined' | 'player_left' | 'player_kicked' | 'host_changed'
   | 'game_started' | 'head_start_over' | 'paused' | 'resumed'
-  | 'locations_updated' | 'you_were_revealed'
+  | 'locations_updated' | 'you_were_revealed' | 'chasers_revealed'
   | 'final_countdown' | 'zone_shrinking' | 'anti_camping'
   | 'time_warning'
   | 'out_of_zone' | 'back_in_zone' | 'revealed_for_leaving_zone' | 'signal_lost'
