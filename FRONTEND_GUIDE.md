@@ -206,10 +206,13 @@ If a value is out of range, you get `error` with code `bad_settings`, and the se
 | …every | `visibility.chaserIntervalSec` | slider | 10–1800 s | 60 |
 | …shown for | `visibility.chaserShowSec` | slider | 0 (until the next one) – interval | 15 |
 | Chasers see each other | `visibility.chasersSeeChasers` | switch | | on |
+| Runners see each other | `visibility.runnersSeeRunners` | switch (teammates live on the runner map, in `map.teammates`) | | on |
 | Sounds & announcements | `announcements` | switch | | on |
 | Anti-camping | `antiCamping.enabled` | switch | | off |
 | …if nobody's caught for | `antiCamping.afterMin` | slider | 1–60 min | 6 |
-| Out-of-zone grace | `outOfZone.graceSec` | slider | 0–300 s | 15 |
+| Leave the zone: chasers see you after | `outOfZone.graceSec` | slider | 0–60 s | 3 |
+| Out if outside too long | `outOfZone.eliminate` | switch | | on |
+| …out after | `outOfZone.eliminateSec` | slider | 3–120 s | 15 |
 | Catch distance | `catching.radiusM` | slider | 5–100 m | 15 |
 | Auto-confirm catch after | `catching.autoAcceptSec` | slider | 5–120 s | 15 |
 | Auto-catch when close | `catching.auto` | switch (no tag or confirm: staying close catches the runner) | | off |
@@ -241,6 +244,7 @@ Events are one-off moments. Play a sound or voice line and show a toast. Only pl
 | `anti_camping` | all | | "Nobody's been caught. Exact locations next!" |
 | `time_warning` | all | `minutesLeft` (5 or 1) | "5 minutes left" |
 | `out_of_zone` / `back_in_zone` | that player | | alarm / all-clear |
+| `eliminated_by_zone` | all | `playerId` | "Ben stayed out of the zone too long. Out!" |
 | `revealed_for_leaving_zone` | that runner + chasers | `playerId` | "Cleo left the zone. Location revealed!" |
 | `catch_request` | the runner and chaser | `catchId, chaserId, runnerId` | runner: show the confirm modal |
 | `catch_disputed` | chaser, runner, host | `catchId, chaserId, runnerId` | "Ava disputed the catch" |

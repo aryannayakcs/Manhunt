@@ -93,6 +93,8 @@ export const SettingsSchema = z.object({
     chaserShowSec: z.number().int().min(0).max(1800),
     /** Chasers see their teammates. */
     chasersSeeChasers: z.boolean(),
+    /** Runners see their teammates live (needs runnerView = map). */
+    runnersSeeRunners: z.boolean(),
   }),
   /** If nobody is caught for N minutes, the next update is exact even when fuzzy is on. */
   antiCamping: z.object({
@@ -102,6 +104,10 @@ export const SettingsSchema = z.object({
   outOfZone: z.object({
     /** Seconds a runner can be outside the zone before chasers see their exact location. */
     graceSec: z.number().int().min(0).max(300),
+    /** Runners who stay outside the zone too long are out of the game. */
+    eliminate: z.boolean(),
+    /** Seconds outside the zone before a runner is out. */
+    eliminateSec: z.number().int().min(3).max(300),
   }),
   catching: z.object({
     /** Max distance between chaser and runner for a catch to count (GPS accuracy is added on top, capped). */
@@ -132,9 +138,9 @@ export const DEFAULT_SETTINGS: Settings = {
   jail: { location: null, radiusM: 15, holdSec: 5, immunitySec: 10 },
   runnerView: 'map',
   announcements: true,
-  visibility: { runnersSeeChasers: false, chaserUpdates: 'interval', chaserIntervalSec: 60, chaserShowSec: 15, chasersSeeChasers: true },
+  visibility: { runnersSeeChasers: false, chaserUpdates: 'interval', chaserIntervalSec: 60, chaserShowSec: 15, chasersSeeChasers: true, runnersSeeRunners: true },
   antiCamping: { enabled: false, afterMin: 6 },
-  outOfZone: { graceSec: 15 },
+  outOfZone: { graceSec: 3, eliminate: true, eliminateSec: 15 },
   catching: { radiusM: 15, autoAcceptSec: 15, auto: false, autoRadiusM: 5, autoHoldSec: 2 },
 };
 

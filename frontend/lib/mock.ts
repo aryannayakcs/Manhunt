@@ -23,9 +23,9 @@ export const SETTINGS: Settings = {
   jail: { location: null, radiusM: 15, holdSec: 5, immunitySec: 10 },
   runnerView: 'map',
   announcements: true,
-  visibility: { runnersSeeChasers: false, chaserUpdates: 'interval', chaserIntervalSec: 60, chaserShowSec: 15, chasersSeeChasers: true },
+  visibility: { runnersSeeChasers: false, chaserUpdates: 'interval', chaserIntervalSec: 60, chaserShowSec: 15, chasersSeeChasers: true, runnersSeeRunners: true },
   antiCamping: { enabled: false, afterMin: 6 },
-  outOfZone: { graceSec: 15 },
+  outOfZone: { graceSec: 3, eliminate: true, eliminateSec: 15 },
   catching: { radiusM: 15, autoAcceptSec: 15, auto: false, autoRadiusM: 5, autoHoldSec: 2 },
 };
 
@@ -85,7 +85,7 @@ export function game(o: GameOpts = {}): GameState {
     you: {
       id: me.id, role: me.role, status: me.status, isHost: me.isHost,
       location: live('me', POS.me),
-      inZone: playing ? true : null, outOfZoneRevealInSec: null, revealedForLeavingZone: false,
+      inZone: playing ? true : null, outOfZoneRevealInSec: null, outOfZoneOutInSec: null, revealedForLeavingZone: false,
       heartbeat: playing && me.role === 'runner' && settings.heartbeat.enabled ? 0 : null,
       jailbreakProgressSec: null,
       ...o.you,
@@ -104,7 +104,7 @@ export function game(o: GameOpts = {}): GameState {
       finalCountdownActive: false,
       ...o.timers,
     },
-    map: { runners: [], chasers: [], everyone: [], ...o.map },
+    map: { runners: [], chasers: [], everyone: [], teammates: [], ...o.map },
     pendingCatch: o.pendingCatch ?? null,
     results: o.results ?? null,
   };
@@ -114,6 +114,10 @@ export const chaserMap = (): Partial<GameState['map']> => ({
   runners: CHASER_HINTS,
   chasers: [live('me', at(0, 0)), live('ava', POS.ava), live('cleo', POS.cleo)],
 });
+/** What a runner sees of their teammates (Dev is in jail). */
+export const teammates = (): GameState['map']['teammates'] => [
+  { ...live('ben', POS.ben), status: 'free' }, { ...live('dev', POS.dev), status: 'jailed' }, { ...live('eli', POS.eli), status: 'free' },
+];
 export const everyone = (): LiveMarker[] => Object.entries(POS).map(([id, p]) => live(id, p));
 
 /** End-of-game results with wandering routes for the replay. */
@@ -158,6 +162,6 @@ export function ctx(o: Partial<Ctx> = {}): Ctx {
     conn: 'open', waking: false, state: null, profile: ME_PROFILE, setProfile: noop, send: noop,
     createGame: noop, joinGame: noop, leave: noop, error: null, clearError: noop, toasts: [], flash: null,
     clearFlash: noop, geo: 'ok', accuracy: 6, ready: true, makeReady: async () => {},
-    kicked: false, clearKicked: noop, pendingCode: null, notify: noop, replaced: false, ...o,
+    kicked: false, clearKicked: noop, pendingCode: null, notify: noop, replaced: false, ping: null, ...o,
   };
 }

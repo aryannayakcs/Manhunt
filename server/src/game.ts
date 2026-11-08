@@ -471,12 +471,35 @@ export class Game {
         this.emit('back_in_zone', {}, [p.id]);
       }
       p.inZone = inside;
-      if (!inside && p.role === 'runner' && this.phase === 'active' && !p.revealedOut
-        && e - Math.max(p.outOfZoneSince ?? e, this.headStartMs) >= this.settings.outOfZone.graceSec * 1000) {
+      if (inside || p.role !== 'runner' || this.phase !== 'active') continue;
+      // Time outside counts from when the chase started (the head start is for getting into the zone).
+      const outFor = e - Math.max(p.outOfZoneSince ?? e, this.headStartMs);
+      const oz = this.settings.outOfZone;
+      if (oz.eliminate && outFor >= oz.eliminateSec * 1000) {
+        this.eliminateForZone(p);
+        if (!this.inPlay()) return; // that ended the game
+        continue;
+      }
+      if (!p.revealedOut && outFor >= oz.graceSec * 1000) {
         p.revealedOut = true;
         this.emit('revealed_for_leaving_zone', { playerId: p.id }, [p.id, ...this.ids(q => q.role === 'chaser')]);
       }
     }
+  }
+
+  /** A runner stayed outside the zone too long: they're out (spectate), whatever the caught mode. */
+  private eliminateForZone(p: Player) {
+    for (const pc of this.pending.values()) if (pc.runnerId === p.id) this.pending.delete(pc.id);
+    p.status = 'out';
+    p.caughtAtChaseMs ??= this.chaseElapsed();
+    p.revealedOut = false;
+    p.signalLost = false;
+    p.autoNear = null;
+    p.jailHoldSince = null;
+    this.reveals.delete(p.id);
+    this.log('eliminated_by_zone', p.id);
+    this.emit('eliminated_by_zone', { playerId: p.id });
+    this.checkWin();
   }
 
   /** Locking the phone or closing Safari stops location updates. That must not be a way to hide. */
@@ -770,6 +793,8 @@ export class Game {
         inZone: playing ? me.inZone : null,
         outOfZoneRevealInSec: runnerFree && me.inZone === false && !me.revealedOut && me.outOfZoneSince !== null
           ? Math.max(0, Math.ceil((Math.max(me.outOfZoneSince, this.headStartMs) + this.settings.outOfZone.graceSec * 1000 - e) / 1000)) : null,
+        outOfZoneOutInSec: runnerFree && me.inZone === false && me.outOfZoneSince !== null && this.settings.outOfZone.eliminate
+          ? Math.max(0, Math.ceil((Math.max(me.outOfZoneSince, this.headStartMs) + this.settings.outOfZone.eliminateSec * 1000 - e) / 1000)) : null,
         revealedForLeavingZone: runnerFree && me.revealedOut,
         heartbeat,
         jailbreakProgressSec: me.jailHoldSince !== null ? Math.floor((e - me.jailHoldSince) / 1000) : null,
@@ -804,6 +829,9 @@ export class Game {
           : [...this.chaserReveals].filter(([id, r]) => this.players.get(id)?.role === 'chaser' && (vis.chaserShowSec === 0 || e - r.at < vis.chaserShowSec * 1000))
               .map(([id, r]) => ({ playerId: id, lat: r.lat, lng: r.lng, accuracy: Math.round(r.accuracy), ageSec: Math.round((e - r.at) / 1000) })),
         everyone: spectator ? all.map(live).filter(x => x !== null) : [],
+        teammates: playing && me.role === 'runner' && me.status !== 'out' && this.settings.runnerView === 'map' && vis.runnersSeeRunners
+          ? all.filter(p => p.id !== me.id && p.role === 'runner' && p.status !== 'out' && p.loc).map(p => ({ ...live(p)!, status: p.status }))
+          : [],
       },
       pendingCatch: pc ? {
         catchId: pc.id, chaserId: pc.chaserId, runnerId: pc.runnerId,

@@ -14,6 +14,11 @@ const chaserMks = (s: GameState): Mk[] => s.map.chasers.filter((c) => c.playerId
   const p = byId(s, c.playerId);
   return { id: `c-${c.playerId}`, lat: c.lat, lng: c.lng, color: p?.color ?? '#ff5a2c', kind: 'tri', label: p?.name, sub: c.ageSec != null ? fmtAge(c.ageSec) : undefined };
 });
+/** Fellow runners (when runners see each other). Jailed ones are flagged so you know who to free. */
+const teamMks = (s: GameState): Mk[] => s.map.teammates.map((t) => {
+  const p = byId(s, t.playerId);
+  return { id: `t-${t.playerId}`, lat: t.lat, lng: t.lng, color: p?.color ?? '#1fe3b4', kind: 'dot', label: p?.name, sub: t.status === 'jailed' ? '⛓ IN JAIL' : undefined, subBad: t.status === 'jailed' };
+});
 const freeRunners = (s: GameState) => s.players.filter((p) => p.role === 'runner' && p.status === 'free');
 
 export function RoleReveal({ role, headStartSec, onDone }: { role: 'chaser' | 'runner'; headStartSec: number | null; onDone: () => void }) {
@@ -180,7 +185,7 @@ export function RunnerView({ s, headStart }: { s: GameState; headStart: boolean 
       {headStart && <div className="banner info" style={{ justifyContent: 'center' }}>Run and hide! Chasers released in {fmtTime(t.headStartLeftSec)}</div>}
 
       <ZoneBar s={s} />
-      {view === 'map' && <Map zone={s.zone} finalRadiusM={s.zone.nextRadiusM} jail={s.jail} markers={[...youMk(s, 'var(--runner)'), ...chaserMks(s)]} dim fit follow={null} />}
+      {view === 'map' && <Map zone={s.zone} finalRadiusM={s.zone.nextRadiusM} jail={s.jail} markers={[...youMk(s, 'var(--runner)'), ...teamMks(s), ...chaserMks(s)]} dim fit follow={null} />}
       {view === 'none' ? (
         <div className="grow" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 18 }}>
           <Danger level={level} big />
@@ -198,8 +203,9 @@ export function RunnerView({ s, headStart }: { s: GameState; headStart: boolean 
       {y.inZone === false && !pc && (
         <div className="take red">
           {y.revealedForLeavingZone
-            ? <div className="big" style={{ color: '#fff', fontSize: 66 }}>Chasers can see you!</div>
+            ? <><div className="big" style={{ color: '#fff', fontSize: 62 }}>Chasers can see you!</div>{y.outOfZoneOutInSec != null && <div className="timer red pulse">{y.outOfZoneOutInSec} s</div>}</>
             : <><div className="big" style={{ color: 'var(--danger)', fontSize: 76 }}>Get back in!</div><div className="timer red pulse">{y.outOfZoneRevealInSec ?? 0} s</div><p>Chasers see you in {y.outOfZoneRevealInSec ?? 0} s</p></>}
+          {y.outOfZoneOutInSec != null && <p style={{ fontWeight: 800, fontSize: 20 }}>You&apos;re OUT in {y.outOfZoneOutInSec} s</p>}
           <p className="hint">Return inside the play zone</p>
         </div>
       )}
@@ -227,7 +233,7 @@ export function JailedView({ s }: { s: GameState }) {
       <p className="mut">Walk to the jail and wait for a teammate to free you.</p>
       {s.jail && s.you.location && <div className="banner warn" style={{ justifyContent: 'center' }}>⛓ Jail is {Math.round(distM(s.you.location, s.jail.location))} m away</div>}
       <ZoneBar s={s} />
-      <Map zone={s.zone} finalRadiusM={s.zone.nextRadiusM} jail={s.jail} markers={[...youMk(s, 'var(--runner)'), ...chaserMks(s)]} dim fit />
+      <Map zone={s.zone} finalRadiusM={s.zone.nextRadiusM} jail={s.jail} markers={[...youMk(s, 'var(--runner)'), ...teamMks(s), ...chaserMks(s)]} dim fit />
       <div className="row wrap" style={{ flex: 'none' }}>
         {mates.map((p) => <div key={p.id} className="player" style={{ width: 'auto', minHeight: 44, padding: '4px 10px' }}><Avatar p={p} size="sm" /><span>{p.name}</span><Tag2 p={p} /></div>)}
       </div>

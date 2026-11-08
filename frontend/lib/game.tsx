@@ -7,7 +7,9 @@ import { buzz, sfx, setSoundEnabled, speak, unlockAudio } from './sound';
 export interface Profile { name: string; color: string; avatar: string }
 interface Session { code: string; playerId: string; token: string }
 export interface Toast { id: number; text: string; kind: 'info' | 'warn' | 'danger' }
-export interface Flash { id: number; kind: 'revealed' | 'jailbreak' | 'caught' | 'infected' | 'go' | 'zone_out' | 'back'; text: string }
+export interface Flash { id: number; kind: 'revealed' | 'chasers' | 'jailbreak' | 'caught' | 'infected' | 'go' | 'zone_out' | 'back'; text: string }
+/** A short screen-edge flash + vibration for any game event; level = how important. */
+export interface Ping { id: number; level: 'big' | 'mid' | 'low' }
 export type Geo = 'idle' | 'ok' | 'weak' | 'denied';
 
 export interface Ctx {
@@ -35,6 +37,7 @@ export interface Ctx {
   notify: (text: string, kind?: Toast['kind']) => void;
   /** This tab was replaced by the same player opening the game somewhere else. */
   replaced: boolean;
+  ping: Ping | null;
 }
 
 export const GameCtx = createContext<Ctx>(null as unknown as Ctx);
@@ -68,6 +71,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [kicked, setKicked] = useState(false);
   const [replaced, setReplaced] = useState(false);
+  const [pingState, setPing] = useState<Ping | null>(null);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
 
   const ws = useRef<WebSocket | null>(null);
@@ -110,6 +114,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setFlash((f) => (f?.id === id ? null : f)), ms);
   }, []);
 
+  const PATTERN = { big: [300, 100, 300, 100, 300], mid: [180, 80, 180], low: [60] } as const;
+  const ping = useCallback((level: Ping['level']) => {
+    const id = idc.current++;
+    setPing({ id, level });
+    buzz([...PATTERN[level]]);
+    setTimeout(() => setPing((p) => (p?.id === id ? null : p)), 900);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const nameOf = (id: unknown) => (id === stateRef.current?.you.id ? 'you' : stateRef.current?.players.find((p) => p.id === id)?.name ?? 'Someone');
   const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
@@ -118,37 +130,52 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const me = st?.you;
     const say = (t: string) => speak(t);
     switch (ev) {
-      case 'player_joined': toast(`${d.name ?? nameOf(d.playerId)} joined`); break;
-      case 'player_left': toast(`${d.name ?? nameOf(d.playerId)} left`); break;
-      case 'player_kicked': toast(`${d.name ?? nameOf(d.playerId)} was kicked`, 'warn'); break;
-      case 'host_changed': toast(cap(`${nameOf(d.playerId)} ${d.playerId === me?.id ? 'are' : 'is'} now the host`)); break;
+      case 'player_joined': ping('low'); toast(`${d.name ?? nameOf(d.playerId)} joined`); break;
+      case 'player_left': ping('low'); toast(`${d.name ?? nameOf(d.playerId)} left`); break;
+      case 'player_kicked': ping('low'); toast(`${d.name ?? nameOf(d.playerId)} was kicked`, 'warn'); break;
+      case 'host_changed': ping('low'); toast(cap(`${nameOf(d.playerId)} ${d.playerId === me?.id ? 'are' : 'is'} now the host`)); break;
       // Roles are in the event itself; the state with new roles arrives right after.
-      case 'game_started': sfx.go(); buzz([200, 100, 200]); say((d.chaserIds as string[] | undefined)?.includes(me?.id ?? '') ? "You're a chaser" : "You're a runner. Go!"); break;
-      case 'head_start_over': sfx.go(); toast('Ready or not, here they come!', 'warn'); say('Ready or not, here they come!'); break;
-      case 'paused': toast('Game paused', 'warn'); say('Game paused'); break;
-      case 'resumed': toast('Game resumed'); break;
-      case 'locations_updated': sfx.ping(); toast(d.exact ? 'Exact locations updated' : 'Locations updated'); break;
-      case 'chasers_revealed': sfx.ping(); buzz([80, 60, 80]); toast(`📡 Chasers revealed${d.showSec ? ` for ${d.showSec} s` : ''}. Check your map!`, 'warn'); break;
-      case 'you_were_revealed': sfx.alarm(); buzz([100, 60, 100]); doFlash('revealed', 'Your location was just sent to the chasers', 2500); break;
-      case 'final_countdown': toast('Final countdown! Updates are faster', 'danger'); say('Final countdown'); break;
-      case 'zone_shrinking': toast(d.stages ? `The zone is shrinking! (${d.stage} of ${d.stages})` : 'The zone is shrinking!', 'warn'); say('The zone is shrinking'); buzz(300); break;
-      case 'anti_camping': toast("Nobody's been caught. Exact locations next!", 'danger'); say('Exact locations next'); break;
-      case 'time_warning': toast(`${d.minutesLeft} minute${d.minutesLeft === 1 ? '' : 's'} left`, 'warn'); say(`${d.minutesLeft} minute${d.minutesLeft === 1 ? '' : 's'} left`); break;
-      case 'out_of_zone': sfx.alarm(); buzz([400, 200, 400]); break;
-      case 'back_in_zone': sfx.clear(); toast('Back in the zone'); break;
-      case 'signal_lost': sfx.ping(); toast(cap(`${nameOf(d.playerId)}'s phone went dark. Last spot revealed!`), 'danger'); break;
-      case 'revealed_for_leaving_zone': toast(cap(`${nameOf(d.playerId)} left the zone. Location revealed!`), 'danger'); break;
-      case 'catch_request': if (d.runnerId === me?.id) { sfx.alarm(); buzz([300, 100, 300, 100, 300]); } break;
-      case 'catch_disputed': toast(cap(`${nameOf(d.runnerId)} disputed the catch`), 'warn'); break;
-      case 'catch_rejected': toast(`Too far (${Math.round(Number(d.distanceM))} m). Get closer`, 'warn'); break;
-      case 'player_caught': sfx.catch(); buzz([500]); toast(cap(`${nameOf(d.chaserId)} caught ${nameOf(d.runnerId)}!${d.auto ? ' (auto-catch)' : ''}`), 'danger'); if (d.runnerId === me?.id) doFlash('caught', 'You were caught'); break;
-      case 'player_infected': toast(d.playerId === me?.id ? "You're infected!" : `${nameOf(d.playerId)} is infected!`, 'danger'); if (d.playerId === me?.id) doFlash('infected', "You're infected! You're a chaser now", 3500); break;
-      case 'player_jailed': toast(d.playerId === me?.id ? "You're in jail" : `${nameOf(d.playerId)} is in jail`, 'warn'); break;
-      case 'jailbreak': sfx.fanfare(); say('Jailbreak!'); doFlash('jailbreak', `JAILBREAK! ${cap(nameOf(d.byId))} freed ${(d.freedIds as string[] | undefined)?.includes(me?.id ?? '') ? 'you' : (d.freedIds as unknown[] | undefined)?.length ?? 0}`, 3500); break;
-      case 'game_over': sfx.fanfare(); break;
+      case 'game_started': sfx.go(); ping('big'); say((d.chaserIds as string[] | undefined)?.includes(me?.id ?? '') ? "You're a chaser" : "You're a runner. Go!"); break;
+      case 'head_start_over': sfx.go(); ping('big'); toast('Ready or not, here they come!', 'warn'); say('Ready or not, here they come!'); break;
+      case 'paused': sfx.blip(); ping('mid'); toast('Game paused', 'warn'); say('Game paused'); break;
+      case 'resumed': sfx.blip(); ping('mid'); toast('Game resumed'); say('Game resumed'); break;
+      case 'locations_updated': sfx.ping(); ping('mid'); toast(d.exact ? 'Exact locations updated' : 'Runner locations updated'); break;
+      case 'chasers_revealed': {
+        // The runners' "look at your phone now" moment.
+        const showSec = Number(d.showSec) || 0;
+        sfx.reveal(); ping('big'); say('Chasers revealed');
+        doFlash('chasers', `📡 CHASERS REVEALED · look at your map now${showSec ? ` (${showSec} s)` : ''}`, Math.min(15000, Math.max(4000, showSec * 1000)));
+        break;
+      }
+      case 'you_were_revealed': sfx.alarm(); ping('mid'); doFlash('revealed', 'Your location was just sent to the chasers', 2500); break;
+      case 'final_countdown': sfx.alarm(); ping('mid'); toast('Final countdown! Updates are faster', 'danger'); say('Final countdown'); break;
+      case 'zone_shrinking': sfx.alarm(); ping('mid'); toast(d.stages ? `The zone is shrinking! (${d.stage} of ${d.stages})` : 'The zone is shrinking!', 'warn'); say('The zone is shrinking'); break;
+      case 'anti_camping': sfx.ping(); ping('mid'); toast("Nobody's been caught. Exact locations next!", 'danger'); say('Exact locations next'); break;
+      case 'time_warning': sfx.ping(); ping('mid'); toast(`${d.minutesLeft} minute${d.minutesLeft === 1 ? '' : 's'} left`, 'warn'); say(`${d.minutesLeft} minute${d.minutesLeft === 1 ? '' : 's'} left`); break;
+      case 'out_of_zone': sfx.alarm(); ping('big'); say('Get back in the zone'); break;
+      case 'back_in_zone': sfx.clear(); ping('low'); toast('Back in the zone'); break;
+      case 'signal_lost': sfx.ping(); ping('mid'); toast(cap(`${nameOf(d.playerId)}'s phone went dark. Last spot revealed!`), 'danger'); break;
+      case 'revealed_for_leaving_zone': sfx.ping(); ping('mid'); toast(cap(`${nameOf(d.playerId)} left the zone. Location revealed!`), 'danger'); break;
+      case 'eliminated_by_zone':
+        if (d.playerId === me?.id) { sfx.out(); ping('big'); say("You're out"); doFlash('caught', 'You stayed out of the zone too long. You\u2019re out!', 4000); }
+        else { sfx.catch(); ping('mid'); toast(cap(`${nameOf(d.playerId)} stayed out of the zone too long. Out!`), 'danger'); }
+        break;
+      case 'catch_request': if (d.runnerId === me?.id) { sfx.alarm(); ping('big'); } break;
+      case 'catch_disputed': sfx.blip(); ping('low'); toast(cap(`${nameOf(d.runnerId)} disputed the catch`), 'warn'); break;
+      case 'catch_rejected': sfx.blip(); ping('low'); toast(`Too far (${Math.round(Number(d.distanceM))} m). Get closer`, 'warn'); break;
+      case 'player_caught':
+        sfx.catch(); ping(d.runnerId === me?.id || d.chaserId === me?.id ? 'big' : 'mid');
+        toast(cap(`${nameOf(d.chaserId)} caught ${nameOf(d.runnerId)}!${d.auto ? ' (auto-catch)' : ''}`), 'danger');
+        say(d.runnerId === me?.id ? "You've been caught" : `${nameOf(d.runnerId)} was caught`);
+        if (d.runnerId === me?.id) doFlash('caught', 'You were caught');
+        break;
+      case 'player_infected': ping(d.playerId === me?.id ? 'big' : 'mid'); toast(d.playerId === me?.id ? "You're infected!" : `${nameOf(d.playerId)} is infected!`, 'danger'); if (d.playerId === me?.id) doFlash('infected', "You're infected! You're a chaser now", 3500); break;
+      case 'player_jailed': ping('low'); toast(d.playerId === me?.id ? "You're in jail" : `${nameOf(d.playerId)} is in jail`, 'warn'); break;
+      case 'jailbreak': sfx.fanfare(); ping('big'); say('Jailbreak!'); doFlash('jailbreak', `JAILBREAK! ${cap(nameOf(d.byId))} freed ${(d.freedIds as string[] | undefined)?.includes(me?.id ?? '') ? 'you' : (d.freedIds as unknown[] | undefined)?.length ?? 0}`, 3500); break;
+      case 'game_over': sfx.fanfare(); ping('big'); say(d.winner === 'runners' ? 'Runners win' : d.winner === 'chasers' ? 'Chasers win' : 'Game over'); break;
       default: break;
     }
-  }, [toast, doFlash]);
+  }, [toast, doFlash, ping]);
 
   // ----- WebSocket with auto-reconnect -----
   useEffect(() => {
@@ -289,8 +316,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     conn, waking, state, profile, setProfile, send, createGame, joinGame, leave,
     error, clearError: () => setError(null), toasts, flash, clearFlash: () => setFlash(null),
-    geo, accuracy, ready, makeReady, kicked, clearKicked: () => setKicked(false), pendingCode, notify: toast, replaced,
-  }), [replaced, toast, conn, waking, state, profile, setProfile, send, createGame, joinGame, leave, error, toasts, flash, geo, accuracy, ready, makeReady, kicked, pendingCode]);
+    geo, accuracy, ready, makeReady, kicked, clearKicked: () => setKicked(false), pendingCode, notify: toast, replaced, ping: pingState,
+  }), [pingState, replaced, toast, conn, waking, state, profile, setProfile, send, createGame, joinGame, leave, error, toasts, flash, geo, accuracy, ready, makeReady, kicked, pendingCode]);
 
   return <GameCtx.Provider value={value}>{children}</GameCtx.Provider>;
 }

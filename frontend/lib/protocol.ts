@@ -18,9 +18,9 @@ export interface Settings {
   jail: { location: LatLng | null; radiusM: number; holdSec: number; immunitySec: number };
   runnerView: 'map' | 'none';
   announcements: boolean;
-  visibility: { runnersSeeChasers: boolean; chaserUpdates: 'interval' | 'live'; chaserIntervalSec: number; chaserShowSec: number; chasersSeeChasers: boolean };
+  visibility: { runnersSeeChasers: boolean; chaserUpdates: 'interval' | 'live'; chaserIntervalSec: number; chaserShowSec: number; chasersSeeChasers: boolean; runnersSeeRunners: boolean };
   antiCamping: { enabled: boolean; afterMin: number };
-  outOfZone: { graceSec: number };
+  outOfZone: { graceSec: number; eliminate: boolean; eliminateSec: number };
   catching: { radiusM: number; autoAcceptSec: number; auto: boolean; autoRadiusM: number; autoHoldSec: number };
 }
 
@@ -52,7 +52,7 @@ export interface GameState {
   code: string; phase: Phase; pausedFrom: Phase | null; settings: Settings; players: PublicPlayer[];
   you: {
     id: string; role: Role; status: Status; isHost: boolean; location: LiveMarker | null;
-    inZone: boolean | null; outOfZoneRevealInSec: number | null; revealedForLeavingZone: boolean;
+    inZone: boolean | null; outOfZoneRevealInSec: number | null; outOfZoneOutInSec: number | null; revealedForLeavingZone: boolean;
     heartbeat: number | null; jailbreakProgressSec: number | null;
   };
   zone: {
@@ -62,7 +62,7 @@ export interface GameState {
   };
   jail: { location: LatLng; radiusM: number } | null;
   timers: { headStartLeftSec: number | null; gameLeftSec: number | null; nextUpdateInSec: number | null; chaserRevealInSec: number | null; finalCountdownActive: boolean };
-  map: { runners: RunnerMarker[]; chasers: LiveMarker[]; everyone: LiveMarker[] };
+  map: { runners: RunnerMarker[]; chasers: LiveMarker[]; everyone: LiveMarker[]; teammates: Array<LiveMarker & { status: Status }> };
   pendingCatch: PendingCatch | null;
   results: Results | null;
 }
@@ -71,7 +71,7 @@ export type EventName =
   | 'player_joined' | 'player_left' | 'player_kicked' | 'host_changed'
   | 'game_started' | 'head_start_over' | 'paused' | 'resumed'
   | 'locations_updated' | 'you_were_revealed' | 'chasers_revealed' | 'final_countdown' | 'zone_shrinking' | 'anti_camping'
-  | 'time_warning' | 'out_of_zone' | 'back_in_zone' | 'revealed_for_leaving_zone' | 'signal_lost'
+  | 'time_warning' | 'out_of_zone' | 'back_in_zone' | 'revealed_for_leaving_zone' | 'signal_lost' | 'eliminated_by_zone'
   | 'catch_request' | 'catch_disputed' | 'catch_rejected'
   | 'player_caught' | 'player_infected' | 'player_jailed' | 'jailbreak'
   | 'game_over' | 'back_to_lobby';

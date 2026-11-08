@@ -218,7 +218,7 @@ function Settings({ s, back, openZone }: { s: GameState; back: () => void; openZ
         <Seg value={st.runnerView} opts={[['map', 'Their map'], ['none', 'Nothing']]} set={(v) => up({ runnerView: v })} />
         <div className="card"><Row label="Heartbeat warning"><Switch on={st.heartbeat.enabled} set={(v) => up({ heartbeat: { enabled: v } })} /></Row></div>
 
-        <div className="lbl">Who can see chasers</div>
+        <div className="lbl">Who can see who</div>
         <div className="card">
           <Row label={<span>Runners see chasers<br /><small className="mut">On the runner&apos;s map{st.runnerView === 'none' ? ' (needs “Their map”)' : ''}</small></span>}>
             <Switch on={st.visibility.runnersSeeChasers} set={(v) => up({ visibility: { runnersSeeChasers: v }, ...(v && st.runnerView === 'none' ? { runnerView: 'map' } : {}) })} />
@@ -234,6 +234,9 @@ function Settings({ s, back, openZone }: { s: GameState; back: () => void; openZ
               )}
             </>
           )}
+          <Row label={<span>Runners see each other<br /><small className="mut">Teammates live on the runner&apos;s map</small></span>}>
+            <Switch on={st.visibility.runnersSeeRunners} set={(v) => up({ visibility: { runnersSeeRunners: v }, ...(v && st.runnerView === 'none' ? { runnerView: 'map' } : {}) })} />
+          </Row>
           <Row label={<span>Chasers see each other<br /><small className="mut">Teammates on the chaser map</small></span>}>
             <Switch on={st.visibility.chasersSeeChasers} set={(v) => up({ visibility: { chasersSeeChasers: v } })} />
           </Row>
@@ -242,6 +245,9 @@ function Settings({ s, back, openZone }: { s: GameState; back: () => void; openZ
         <div className="lbl">Play zone</div>
         <div className="card">
           <Row label="Zone"><button className="pill" onClick={openZone}>{st.zone.center ? `${st.zone.radiusM} m · edit` : 'Draw'}</button></Row>
+          <Slider label="Leave the zone: chasers see you after" value={st.outOfZone.graceSec} min={0} max={60} fmt={(v) => (v === 0 ? 'instantly' : `${v} s`)} set={(v) => up({ outOfZone: { graceSec: v } })} />
+          <Row label={<span>Out if outside too long<br /><small className="mut">Runners who don&apos;t get back in are out</small></span>}><Switch on={st.outOfZone.eliminate} set={(v) => up({ outOfZone: { eliminate: v } })} /></Row>
+          {st.outOfZone.eliminate && <Slider label="Out after" value={st.outOfZone.eliminateSec} min={3} max={120} fmt={(v) => `${v} s outside`} set={(v) => up({ outOfZone: { eliminateSec: v } })} />}
           <Row label="Shrinking zone"><Switch on={st.shrinkingZone.enabled} set={(v) => up({ shrinkingZone: { enabled: v } })} /></Row>
           {st.shrinkingZone.enabled && (() => {
             const sz = st.shrinkingZone;
@@ -300,12 +306,11 @@ function Settings({ s, back, openZone }: { s: GameState; back: () => void; openZ
 
         <div className="card"><Row label="Sounds & announcements"><Switch on={st.announcements} set={(v) => up({ announcements: v })} /></Row></div>
 
-        <button className="card setrow" type="button" onClick={() => setAdv((a) => !a)}><span>Advanced {adv ? '▴' : '▾'}</span><span className="mut">Catch distance, grace…</span></button>
+        <button className="card setrow" type="button" onClick={() => setAdv((a) => !a)}><span>Advanced {adv ? '▴' : '▾'}</span><span className="mut">Catch distance, heartbeat…</span></button>
         {adv && (
           <div className="card">
             <Slider label="Catch distance" value={st.catching.radiusM} min={5} max={100} fmt={(v) => `${v} m`} set={(v) => up({ catching: { radiusM: v } })} />
             <Slider label="Auto-confirm catch after" value={st.catching.autoAcceptSec} min={5} max={120} fmt={(v) => `${v} s`} set={(v) => up({ catching: { autoAcceptSec: v } })} />
-            <Slider label="Out-of-zone grace" value={st.outOfZone.graceSec} min={0} max={300} fmt={(v) => `${v} s`} set={(v) => up({ outOfZone: { graceSec: v } })} />
             {(['Far', 'Close', 'Very close'] as const).map((l, i) => (
               <Slider key={l} label={`Heartbeat: ${l}`} value={st.heartbeat.distancesM[i]} min={5} max={200} fmt={(v) => `${v} m`}
                 set={(v) => { const d = [...st.heartbeat.distancesM] as [number, number, number]; d[i] = v; up({ heartbeat: { distancesM: d } }); }} />

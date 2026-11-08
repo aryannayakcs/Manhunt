@@ -140,6 +140,8 @@ export interface GameState {
     inZone: boolean | null;
     /** Seconds left before chasers see you (runners outside the zone). null when inside. */
     outOfZoneRevealInSec: number | null;
+    /** Seconds left before a runner outside the zone is out of the game (when that rule is on). */
+    outOfZoneOutInSec: number | null;
     /** True while chasers can see your exact location because you left the zone. */
     revealedForLeavingZone: boolean;
     /** Runners only, heartbeat enabled: 0 = nobody near, 1 = far, 2 = medium, 3 = near. */
@@ -182,6 +184,8 @@ export interface GameState {
     chasers: LiveMarker[];
     /** Spectators and the end screen only: everyone live. */
     everyone: LiveMarker[];
+    /** Runners (when runners see each other): other runners still in the game, live. */
+    teammates: Array<LiveMarker & { status: Status }>;
   };
   /** A catch involving you that's waiting on the runner. */
   pendingCatch: PendingCatch | null;
@@ -194,7 +198,7 @@ export type EventName =
   | 'locations_updated' | 'you_were_revealed' | 'chasers_revealed'
   | 'final_countdown' | 'zone_shrinking' | 'anti_camping'
   | 'time_warning'
-  | 'out_of_zone' | 'back_in_zone' | 'revealed_for_leaving_zone' | 'signal_lost'
+  | 'out_of_zone' | 'back_in_zone' | 'revealed_for_leaving_zone' | 'eliminated_by_zone' | 'signal_lost'
   | 'catch_request' | 'catch_disputed' | 'catch_rejected'
   | 'player_caught' | 'player_infected' | 'player_jailed' | 'jailbreak'
   | 'game_over' | 'back_to_lobby';

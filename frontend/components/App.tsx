@@ -127,13 +127,19 @@ export function Kicked({ onClose }: { onClose: () => void }) {
 }
 
 export function Overlays({ s }: { s: GameState | null }) {
-  const { toasts, flash, conn, geo, accuracy, clearFlash, replaced } = useGame();
+  const { toasts, flash, conn, geo, accuracy, clearFlash, replaced, ping } = useGame();
   const dismiss = useCallback(() => clearFlash(), [clearFlash]);
   const playing = !!s && s.phase !== 'lobby' && s.phase !== 'ended';
   return (
     <>
       <div className="toasts" aria-live="polite">{toasts.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.text}</div>)}</div>
-      {flash && flash.kind !== 'revealed' && (
+      {ping && <div key={ping.id} className={`ping ${ping.level}`} aria-hidden />}
+      {flash?.kind === 'chasers' && (
+        <div className="sysbar" style={{ top: 'calc(env(safe-area-inset-top) + 66px)', bottom: 'auto', zIndex: 66 }}>
+          <div className="banner reveal" role="alert">{flash.text}</div>
+        </div>
+      )}
+      {flash && flash.kind !== 'revealed' && flash.kind !== 'chasers' && (
         <div className={`take ${flash.kind === 'jailbreak' ? 'runner' : flash.kind === 'infected' ? 'chaser' : 'red'}`} style={{ zIndex: 70 }} onClick={dismiss} role="button">
           <div className="big" style={{ fontSize: 56 }}>{flash.text}</div>
         </div>

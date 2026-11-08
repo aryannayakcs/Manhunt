@@ -131,7 +131,7 @@ test('jail mode: standing in jail frees jailed runners with immunity', () => {
 });
 
 test('leaving the zone reveals the runner exactly after the grace period', () => {
-  const { game, host, at, advance, roles, events } = setup(2, { headStart: { enabled: false, seconds: 10 }, outOfZone: { graceSec: 10 }, locationUpdates: { mode: 'off', intervalSec: 60 } });
+  const { game, host, at, advance, roles, events } = setup(2, { headStart: { enabled: false, seconds: 10 }, outOfZone: { graceSec: 10, eliminate: false, eliminateSec: 15 }, locationUpdates: { mode: 'off', intervalSec: 60 } });
   game.handle(host.id, { type: 'start_game' });
   const { chasers: [c], runners: [r] } = roles();
   at(c.id, 0); at(r.id, 300);
@@ -347,7 +347,7 @@ test('bug fixes: chaser needs working GPS to catch; mid-game joiners get no awar
 });
 
 test('bug fixes: zone grace starts when the chase starts; no phone-off penalty right after a pause', () => {
-  const { game, host, at, advance, roles } = setup(2, { headStart: { enabled: true, seconds: 30 }, outOfZone: { graceSec: 15 }, locationUpdates: { mode: 'off', intervalSec: 60, showSec: 0 } });
+  const { game, host, at, advance, roles } = setup(2, { headStart: { enabled: true, seconds: 30 }, outOfZone: { graceSec: 15, eliminate: false, eliminateSec: 15 }, locationUpdates: { mode: 'off', intervalSec: 60, showSec: 0 } });
   game.handle(host.id, { type: 'start_game' });
   const { chasers: [c], runners: [r] } = roles();
   // runner outside the zone for the whole head start
@@ -365,4 +365,39 @@ test('bug fixes: zone grace starts when the chase starts; no phone-off penalty r
   assert.equal(game.stateFor(c.id).map.runners.length, 0, 'no instant phone-off reveal after resuming');
   for (let i = 0; i < 31; i++) { at(c.id, 0); advance(1); }
   assert.equal(game.stateFor(c.id).map.runners[0]?.reason, 'signal_lost', 'still applies if the phone stays dark');
+});
+
+test('leaving the zone: shown after 3 s, out after 15 s (defaults); coming back in resets the clock', () => {
+  const { game, host, at, advance, roles, events } = setup(3, { headStart: { enabled: false, seconds: 10 }, locationUpdates: { mode: 'off', intervalSec: 60, showSec: 0 } });
+  game.handle(host.id, { type: 'start_game' });
+  const { chasers: [c], runners: [r1, r2] } = roles();
+  const step = (r1m: number) => { at(c.id, 0); at(r1.id, r1m); at(r2.id, 50); advance(1); };
+  step(300); // r1 steps out
+  assert.equal(game.stateFor(r1.id).you.outOfZoneOutInSec, 15);
+  step(300); step(300);
+  assert.equal(game.stateFor(c.id).map.runners.length, 0, 'not shown before 3 s');
+  step(300);
+  assert.equal(game.stateFor(c.id).map.runners[0]?.reason, 'out_of_zone', 'shown after 3 s');
+  for (let i = 0; i < 6; i++) step(300); // ~10 s outside
+  step(10); // back in: clock resets
+  assert.equal(r1.status, 'free');
+  assert.equal(game.stateFor(r1.id).you.outOfZoneOutInSec, null);
+  for (let i = 0; i < 14; i++) step(300);
+  assert.equal(r1.status, 'free', '14 s outside: still in');
+  step(300); step(300);
+  assert.equal(r1.status, 'out', 'out after 15 s outside');
+  assert.ok(events(c.id).includes('eliminated_by_zone'));
+  assert.equal(game.phase, 'active', 'the other runner is still in');
+  for (let i = 0; i < 17; i++) { at(c.id, 0); at(r2.id, 300); advance(1); }
+  assert.equal(game.phase, 'ended', 'last runner out = chasers win');
+  assert.equal(game.stateFor(c.id).results?.winner, 'chasers');
+});
+
+test('runners see their teammates (on by default), chasers never see them through this', () => {
+  const { game, host, at, roles } = setup(4, { headStart: { enabled: false, seconds: 10 } });
+  game.handle(host.id, { type: 'start_game' });
+  const { chasers: [c], runners: [r1, r2, r3] } = roles();
+  at(c.id, 0); at(r1.id, 50); at(r2.id, 80); at(r3.id, 120);
+  assert.deepEqual(game.stateFor(r1.id).map.teammates.map(t => t.playerId).sort(), [r2.id, r3.id].sort());
+  assert.equal(game.stateFor(c.id).map.teammates.length, 0);
 });
