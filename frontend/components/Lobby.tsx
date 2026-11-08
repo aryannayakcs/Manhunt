@@ -52,7 +52,7 @@ export function Lobby({ s, onEditProfile, initialView = 'main' }: { s: GameState
       <button className="btn sm ghost" style={{ minHeight: 48, fontSize: 15 }} onClick={() => setTips(true)}>🔒 Lock your phone into the game</button>
       {tips && <LockTips onClose={() => setTips(false)} />}
 
-      {s.zone.center ? <div style={{ height: 150, display: 'flex', flex: 'none' }}><Map zone={s.zone} finalRadiusM={s.zone.finalRadiusM} jail={s.jail} fit follow={null} markers={me(s)} /></div>
+      {s.zone.center ? <div style={{ height: 150, display: 'flex', flex: 'none' }}><Map zone={s.zone} finalRadiusM={s.zone.nextRadiusM} jail={s.jail} fit follow={null} markers={me(s)} /></div>
         : <div className="card center mut">{host ? 'No play zone yet' : 'Host is setting up the play zone…'}</div>}
 
       <div className="row mut wrap" style={{ fontSize: 13, justifyContent: 'space-between' }}>
@@ -231,12 +231,31 @@ function Settings({ s, back, openZone }: { s: GameState; back: () => void; openZ
         <div className="card">
           <Row label="Zone"><button className="pill" onClick={openZone}>{st.zone.center ? `${st.zone.radiusM} m · edit` : 'Draw'}</button></Row>
           <Row label="Shrinking zone"><Switch on={st.shrinkingZone.enabled} set={(v) => up({ shrinkingZone: { enabled: v } })} /></Row>
-          {st.shrinkingZone.enabled && (
-            <>
-              <Slider label="Starts after" value={st.shrinkingZone.startAfterMin} min={0} max={180} fmt={min} set={(v) => up({ shrinkingZone: { startAfterMin: v } })} />
-              <Slider label="Final size" value={Math.min(st.shrinkingZone.finalRadiusM, st.zone.radiusM)} min={10} max={Math.max(20, st.zone.radiusM)} fmt={(v) => `${v} m`} set={(v) => up({ shrinkingZone: { finalRadiusM: v } })} />
-            </>
-          )}
+          {st.shrinkingZone.enabled && (() => {
+            const sz = st.shrinkingZone;
+            const times = sz.style === 'stages' ? Array.from({ length: sz.stages }, (_, i) => sz.startAfterMin + i * sz.intervalMin) : [];
+            const late = times.filter((x) => x >= st.durationMin).length;
+            return (
+              <>
+                <Seg value={sz.style} opts={[['stages', 'In stages'], ['smooth', 'Continuously']]} set={(v) => up({ shrinkingZone: { style: v } })} />
+                <Slider label={sz.style === 'stages' ? 'First shrink at' : 'Starts shrinking at'} value={Math.min(sz.startAfterMin, st.durationMin)} min={0} max={st.durationMin} fmt={(v) => `${v} min`} set={(v) => up({ shrinkingZone: { startAfterMin: v } })} />
+                {sz.style === 'stages' && (
+                  <>
+                    <Row label="Number of shrinks"><Stepper value={sz.stages} min={1} max={10} set={(v) => up({ shrinkingZone: { stages: v } })} /></Row>
+                    <Slider label="Time between shrinks" value={sz.intervalMin} min={1} max={60} fmt={min} set={(v) => up({ shrinkingZone: { intervalMin: v } })} />
+                    <Slider label="Each shrink takes" value={Math.min(sz.shrinkSec, sz.intervalMin * 60)} min={10} max={Math.min(600, sz.intervalMin * 60)} step={10} fmt={sec} set={(v) => up({ shrinkingZone: { shrinkSec: v } })} />
+                  </>
+                )}
+                <Slider label="Final size" value={Math.min(sz.finalRadiusM, st.zone.radiusM)} min={10} max={Math.max(20, st.zone.radiusM)} fmt={(v) => `${v} m`} set={(v) => up({ shrinkingZone: { finalRadiusM: v } })} />
+                <p className="hint" style={{ textAlign: 'left', paddingBottom: 6 }}>
+                  {sz.style === 'stages'
+                    ? `Holds still, then shrinks at ${times.map((x) => `${x}`).join(', ')} min into a ${st.durationMin}-min game, ending at ${Math.min(sz.finalRadiusM, st.zone.radiusM)} m.`
+                    : `Shrinks steadily from ${sz.startAfterMin} min until the end of the game.`}
+                  {late > 0 && <b style={{ color: 'var(--warn)' }}> {late} shrink{late > 1 ? 's' : ''} would come after the game ends.</b>}
+                </p>
+              </>
+            );
+          })()}
         </div>
 
         <div className="lbl">When a runner is caught</div>

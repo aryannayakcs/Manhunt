@@ -176,7 +176,7 @@ test('time up with a free runner = runners win; pause stops the clock', () => {
 });
 
 test('shrinking zone gets smaller over the game', () => {
-  const { game, host, advance } = setup(2, { headStart: { enabled: false, seconds: 10 }, durationMin: 10, zone: { center: CENTER, radiusM: 200 }, shrinkingZone: { enabled: true, startAfterMin: 0, finalRadiusM: 100 } });
+  const { game, host, advance } = setup(2, { headStart: { enabled: false, seconds: 10 }, durationMin: 10, zone: { center: CENTER, radiusM: 200 }, shrinkingZone: { enabled: true, style: 'smooth', startAfterMin: 0, finalRadiusM: 100 } });
   game.handle(host.id, { type: 'start_game' });
   advance(300);
   assert.equal(Math.round(game.zoneRadius()), 150);
@@ -240,4 +240,30 @@ test('who can see chasers: runners (off by default) and chasers (on by default)'
   const { runners: [r3], chasers: [e1] } = roles();
   at(e1.id, 0); at(r3.id, 100);
   assert.equal(game.stateFor(r3.id).map.chasers.length, 0);
+});
+
+test('staged zone: holds, shrinks one step at a time, announces each stage', () => {
+  // 3 stages from 200 m to 80 m: 160 -> 120 -> 80. First shrink at 2 min, every 3 min, each takes 60 s.
+  const { game, host, advance, events } = setup(2, { headStart: { enabled: false, seconds: 10 }, durationMin: 20,
+    shrinkingZone: { enabled: true, style: 'stages', startAfterMin: 2, finalRadiusM: 80, stages: 3, intervalMin: 3, shrinkSec: 60 } });
+  game.handle(host.id, { type: 'start_game' });
+  const z = () => game.stateFor(host.id).zone;
+  assert.equal(z().radiusM, 200);
+  assert.equal(z().nextRadiusM, 160);
+  assert.equal(z().nextShrinkInSec, 120);
+  advance(119);
+  assert.equal(z().radiusM, 200, 'holds until the first shrink');
+  advance(31);
+  assert.equal(z().shrinking, true);
+  assert.equal(z().radiusM, 180, 'halfway through the first shrink');
+  advance(30);
+  assert.equal(z().radiusM, 160);
+  assert.equal(z().shrinking, false, 'holds after the shrink');
+  assert.equal(z().nextRadiusM, 120);
+  assert.equal(z().nextShrinkInSec, 120);
+  assert.equal(z().stage, 2);
+  advance(120 + 60 + 120 + 60);
+  assert.equal(z().radiusM, 80, 'reaches the final size after the last stage');
+  assert.equal(z().nextRadiusM, null);
+  assert.equal(events(host.id).filter(e => e === 'zone_shrinking').length, 3);
 });

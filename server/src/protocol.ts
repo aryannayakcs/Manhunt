@@ -151,7 +151,15 @@ export interface GameState {
     radiusM: number;
     /** Where the zone ends up, when shrinking is on. */
     finalRadiusM: number | null;
+    /** True while the circle is actually getting smaller. */
     shrinking: boolean;
+    /** The size of the next shrink (draw as a dashed circle). null when no more shrinks are coming. */
+    nextRadiusM: number | null;
+    /** Seconds until the next shrink starts (0 while shrinking). null when none is coming. */
+    nextShrinkInSec: number | null;
+    /** Staged zones: which shrink is next or happening (1-based) out of how many. */
+    stage: number | null;
+    stages: number | null;
   };
   jail: { location: LatLng; radiusM: number } | null;
   timers: {

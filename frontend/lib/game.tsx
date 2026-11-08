@@ -127,7 +127,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       case 'locations_updated': sfx.ping(); toast(d.exact ? 'Exact locations updated' : 'Locations updated'); break;
       case 'you_were_revealed': sfx.alarm(); buzz([100, 60, 100]); doFlash('revealed', 'Your location was just sent to the chasers', 2500); break;
       case 'final_countdown': toast('Final countdown! Updates are faster', 'danger'); say('Final countdown'); break;
-      case 'zone_shrinking': toast('The zone is shrinking!', 'warn'); say('The zone is shrinking'); break;
+      case 'zone_shrinking': toast(d.stages ? `The zone is shrinking! (${d.stage} of ${d.stages})` : 'The zone is shrinking!', 'warn'); say('The zone is shrinking'); buzz(300); break;
       case 'anti_camping': toast("Nobody's been caught. Exact locations next!", 'danger'); say('Exact locations next'); break;
       case 'time_warning': toast(`${d.minutesLeft} minute${d.minutesLeft === 1 ? '' : 's'} left`, 'warn'); say(`${d.minutesLeft} minute${d.minutesLeft === 1 ? '' : 's'} left`); break;
       case 'out_of_zone': sfx.alarm(); buzz([400, 200, 400]); break;

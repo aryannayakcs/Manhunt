@@ -5,7 +5,7 @@
 - Chaser selection: random (set count) or picked by the host
 - Game duration 1 min – 3 h, head start (toggle + length), location updates (interval / live / off)
 - Fuzzy updates, final countdown, heartbeat warning, anti-camping (all toggleable)
-- Circular play zone, optional shrinking zone, out-of-zone warning and reveal
+- Circular play zone, optional shrinking zone (in stages with set timings, or continuous), out-of-zone warning and reveal
 - When caught: out / infection / jail with jailbreak and immunity
 - Runner view: map / nothing (runners only get a pulsing "how close" warning, never a direction)
 - Who can see chasers: runners (optional) and other chasers (optional)

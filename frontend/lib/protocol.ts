@@ -13,7 +13,7 @@ export interface Settings {
   finalCountdown: { enabled: boolean; lastMin: number; intervalSec: number };
   heartbeat: { enabled: boolean; distancesM: [number, number, number] };
   zone: { center: LatLng | null; radiusM: number };
-  shrinkingZone: { enabled: boolean; startAfterMin: number; finalRadiusM: number };
+  shrinkingZone: { enabled: boolean; style: 'stages' | 'smooth'; startAfterMin: number; finalRadiusM: number; stages: number; intervalMin: number; shrinkSec: number };
   caughtMode: 'out' | 'infection' | 'jail';
   jail: { location: LatLng | null; radiusM: number; holdSec: number; immunitySec: number };
   runnerView: 'map' | 'none';
@@ -55,7 +55,11 @@ export interface GameState {
     inZone: boolean | null; outOfZoneRevealInSec: number | null; revealedForLeavingZone: boolean;
     heartbeat: number | null; jailbreakProgressSec: number | null;
   };
-  zone: { center: LatLng | null; radiusM: number; finalRadiusM: number | null; shrinking: boolean };
+  zone: {
+    center: LatLng | null; radiusM: number; finalRadiusM: number | null; shrinking: boolean;
+    /** Size after the next shrink (dashed circle) and seconds until it starts (0 while shrinking). */
+    nextRadiusM: number | null; nextShrinkInSec: number | null; stage: number | null; stages: number | null;
+  };
   jail: { location: LatLng; radiusM: number } | null;
   timers: { headStartLeftSec: number | null; gameLeftSec: number | null; nextUpdateInSec: number | null; finalCountdownActive: boolean };
   map: { runners: RunnerMarker[]; chasers: LiveMarker[]; everyone: LiveMarker[] };

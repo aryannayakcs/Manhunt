@@ -188,7 +188,11 @@ If a value is out of range, you get `error` with code `bad_settings`, and the se
 | Heartbeat distances | `heartbeat.distancesM` | 3 numbers [far, mid, near] | meters | [80, 50, 25] |
 | Play zone | `zone.center`, `zone.radiusM` | map circle | 20–20000 m | 200 m |
 | Shrinking zone | `shrinkingZone.enabled` | switch | | off |
-| …starts after | `shrinkingZone.startAfterMin` | slider | 0–180 min | 5 |
+| …style | `shrinkingZone.style` | `stages` (holds, then shrinks a step) / `smooth` (continuous) | | `stages` |
+| …first shrink at | `shrinkingZone.startAfterMin` | slider | 0–180 min | 5 |
+| …number of shrinks | `shrinkingZone.stages` | stepper | 1–10 | 3 |
+| …time between shrinks | `shrinkingZone.intervalMin` | slider | 1–60 min | 4 |
+| …each shrink takes | `shrinkingZone.shrinkSec` | slider | 10–600 s (≤ time between) | 60 |
 | …final size | `shrinkingZone.finalRadiusM` | slider | 10 m – zone size | 80 |
 | When caught | `caughtMode` | `out` / `infection` / `jail` | | `out` |
 | Jail location | `jail.location` | map pin (null = zone center) | | null |
@@ -225,7 +229,7 @@ Events are one-off moments. Play a sound or voice line and show a toast. Only pl
 | `locations_updated` | chasers, spectators | `exact` | ping sound + "Locations updated" |
 | `you_were_revealed` | free runners | `exact` | "Your location was sent!" |
 | `final_countdown` | all | `minutesLeft` | "Final countdown! Updates are faster" |
-| `zone_shrinking` | all | `finalRadiusM` | "The zone is shrinking!" |
+| `zone_shrinking` | all | `toRadiusM, stage, stages` | "The zone is shrinking! (2 of 3)" |
 | `anti_camping` | all | | "Nobody's been caught. Exact locations next!" |
 | `time_warning` | all | `minutesLeft` (5 or 1) | "5 minutes left" |
 | `out_of_zone` / `back_in_zone` | that player | | alarm / all-clear |

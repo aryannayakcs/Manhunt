@@ -169,3 +169,5 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 .results button{text-align:left;padding:10px 12px;border-radius:10px;font-size:14px}
 .results button:active,.results button:hover{background:var(--s3)}
 .results small{display:block;color:var(--tx2);font-size:12px}
+.zonebar{flex:none;text-align:center;font:700 13px var(--ui);color:var(--warn);background:#3a2c07;border-radius:12px;padding:7px 10px}
+.zonebar.on{color:#000;background:var(--warn);animation:pls 1.2s infinite}

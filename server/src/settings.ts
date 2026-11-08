@@ -51,9 +51,17 @@ export const SettingsSchema = z.object({
   }),
   shrinkingZone: z.object({
     enabled: z.boolean(),
-    /** Minutes into the chase when shrinking begins. Shrinks linearly to finalRadiusM by the end. */
+    /** stages: holds still, then shrinks a step, several times. smooth: shrinks continuously until the end. */
+    style: z.enum(['stages', 'smooth']),
+    /** Minutes into the chase when the first shrink starts. */
     startAfterMin: z.number().min(0).max(180),
     finalRadiusM: z.number().min(10).max(20000),
+    /** stages: how many shrinks to get from the full size to the final size. */
+    stages: z.number().int().min(1).max(10),
+    /** stages: minutes from the start of one shrink to the start of the next. */
+    intervalMin: z.number().min(1).max(60),
+    /** stages: seconds each shrink takes. */
+    shrinkSec: z.number().int().min(10).max(600),
   }),
   /** What happens to a caught runner: out (spectate), infection (becomes a chaser) or jail (can be freed). */
   caughtMode: z.enum(['out', 'infection', 'jail']),
@@ -105,7 +113,7 @@ export const DEFAULT_SETTINGS: Settings = {
   finalCountdown: { enabled: true, lastMin: 3, intervalSec: 30 },
   heartbeat: { enabled: true, distancesM: [80, 50, 25] },
   zone: { center: null, radiusM: 200 },
-  shrinkingZone: { enabled: false, startAfterMin: 5, finalRadiusM: 80 },
+  shrinkingZone: { enabled: false, style: 'stages', startAfterMin: 5, finalRadiusM: 80, stages: 3, intervalMin: 4, shrinkSec: 60 },
   caughtMode: 'out',
   jail: { location: null, radiusM: 15, holdSec: 5, immunitySec: 10 },
   runnerView: 'map',
@@ -145,5 +153,7 @@ export function applySettingsPatch(current: Settings, patch: unknown): { ok: tru
   // Keep heartbeat distances ordered far > medium > near.
   s.heartbeat.distancesM = [...s.heartbeat.distancesM].sort((a, b) => b - a) as [number, number, number];
   if (s.shrinkingZone.finalRadiusM > s.zone.radiusM) s.shrinkingZone.finalRadiusM = s.zone.radiusM;
+  // A shrink can't take longer than the gap between shrinks.
+  s.shrinkingZone.shrinkSec = Math.min(s.shrinkingZone.shrinkSec, s.shrinkingZone.intervalMin * 60);
   return { ok: true, settings: s };
 }

@@ -37,7 +37,7 @@ const SECTIONS: Section[] = [
       { title: 'Lobby: host picks chasers', desc: 'Ready, zone drawn, “Host picks” on: tap players to switch chaser/runner.', s: game({ phase: 'lobby', settings: { chasers: { count: 2, selection: 'host' } }, others: { ava: { role: 'chaser' }, cleo: { role: 'chaser' } } }), render: (s) => <Lobby s={s} /> },
       { title: 'Lobby: a friend’s view', desc: 'Everyone who isn’t the host waits here.', s: game({ phase: 'lobby', me: { isHost: false }, others: { ava: { isHost: true } } }), render: (s) => <Lobby s={s} /> },
       { title: 'Lock your phone into the game', desc: 'From the lobby button. Guided Access (iPhone) / App pinning (Android) stop the phone from leaving the game or locking.', s: game({ phase: 'lobby' }), render: (s) => <><Lobby s={s} /><LockTips onClose={() => {}} /></> },
-      { title: 'Settings', desc: 'Host only. Every rule of the game. Scroll inside the phone to see all of it.', s: game({ phase: 'lobby' }), render: (s) => <Lobby s={s} initialView="settings" /> },
+      { title: 'Settings', desc: 'Host only. Every rule of the game. Scroll inside the phone to see all of it (shown here with the staged shrinking zone on).', s: game({ phase: 'lobby', settings: { shrinkingZone: { enabled: true, style: 'stages', startAfterMin: 5, finalRadiusM: 80, stages: 3, intervalMin: 4, shrinkSec: 60 } } }), render: (s) => <Lobby s={s} initialView="settings" /> },
       { title: 'Draw the play zone', desc: 'Host taps the map or drags the handle. With jailbreak on, there’s a jail pin too.', s: game({ phase: 'lobby' }), render: (s) => <Lobby s={s} initialView="zone" /> },
     ],
   },
@@ -77,7 +77,8 @@ const SECTIONS: Section[] = [
       { title: 'Revealed for leaving', desc: 'Stayed out too long: chasers see your exact location until you return.', s: game({ ...runner, you: { inZone: false, revealedForLeavingZone: true } }), render: inGame },
       { title: 'Freeing your team', desc: 'Jailbreak mode: stand in the jail for 5 s to free everyone in it.', s: game({ ...runner, you: { jailbreakProgressSec: 3 } }), render: inGame },
       { title: 'Immune after jailbreak', desc: 'Freed runners can’t be caught for a few seconds.', s: game({ ...runner, me: { role: 'runner', isHost: false, immuneSec: 8 } }), render: inGame },
-      { title: 'Shrinking zone', desc: 'Setting: the circle gets smaller during the game. Dashed line = final size.', c: { toasts: [t(1, 'The zone is shrinking!', 'warn')] }, s: game({ ...runner, settings: { shrinkingZone: { enabled: true, startAfterMin: 5, finalRadiusM: 80 } }, zone: { radiusM: 150, shrinking: true } }), render: inGame },
+      { title: 'Zone: waiting for the next shrink', desc: 'Staged zone (setting): it holds still between shrinks. The bar counts down to the next one; the dashed circle is the next size.', s: game({ ...runner, settings: { shrinkingZone: { enabled: true, style: 'stages', startAfterMin: 5, finalRadiusM: 80, stages: 3, intervalMin: 4, shrinkSec: 60 } }, zone: { radiusM: 160, nextRadiusM: 120, nextShrinkInSec: 95, stage: 2, stages: 3 } }), render: inGame },
+      { title: 'Zone: shrinking now', desc: 'During a shrink the bar flashes and the circle closes in to the dashed line over the time you set.', c: { toasts: [t(1, 'The zone is shrinking! (2 of 3)', 'warn')] }, s: game({ ...chaser, map: chaserMap(), settings: { shrinkingZone: { enabled: true, style: 'stages', startAfterMin: 5, finalRadiusM: 80, stages: 3, intervalMin: 4, shrinkSec: 60 } }, zone: { radiusM: 140, shrinking: true, nextRadiusM: 120, nextShrinkInSec: 0, stage: 2, stages: 3 } }), render: inGame },
     ],
   },
   {

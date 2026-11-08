@@ -80,7 +80,7 @@ export class Game {
   private lastCatchAt = 0;
   private reveals = new Map<string, Reveal>();
   private pending = new Map<string, Pending>();
-  private flags = { finalCountdown: false, shrinking: false, antiCamping: false, warned5: false, warned1: false };
+  private flags = { finalCountdown: false, shrinkStage: 0, antiCamping: false, warned5: false, warned1: false };
   private timeline: Results['timeline'] = [];
   private results: Results | null = null;
 
@@ -220,14 +220,34 @@ export class Game {
     if (!phases.includes(this.phase)) throw new GameError('bad_phase', `Can't do that right now (${this.phase}).`);
   }
 
-  zoneRadius(): number {
+  zoneRadius(): number { return this.zoneInfo().radius; }
+
+  /** Current zone size and what's coming next, for both shrink styles. */
+  zoneInfo(): { radius: number; shrinking: boolean; next: number | null; nextInMs: number | null; stage: number | null; stages: number | null } {
     const { zone, shrinkingZone: sz } = this.settings;
+    const r0 = zone.radiusM, rf = Math.min(sz.finalRadiusM, r0);
+    const none = { radius: r0, shrinking: false, next: null, nextInMs: null, stage: null, stages: null };
+    if (!sz.enabled) return none;
     const ph = this.effectivePhase();
-    if (!sz.enabled || (ph !== 'active' && ph !== 'ended')) return zone.radiusM;
     const startMs = sz.startAfterMin * 60_000;
-    if (startMs >= this.durationMs) return zone.radiusM;
-    const frac = Math.min(1, Math.max(0, (this.chaseElapsed() - startMs) / (this.durationMs - startMs)));
-    return zone.radiusM + (sz.finalRadiusM - zone.radiusM) * frac;
+    // Before the chase (lobby / head start): show what the first shrink will be.
+    const t = ph === 'active' || ph === 'ended' ? this.chaseElapsed() - startMs : -Infinity;
+
+    if (sz.style === 'smooth') {
+      if (startMs >= this.durationMs) return none;
+      const frac = Math.min(1, Math.max(0, t / (this.durationMs - startMs)));
+      return { radius: r0 + (rf - r0) * frac, shrinking: t >= 0 && frac < 1 && ph === 'active', next: frac < 1 ? rf : null, nextInMs: t < 0 && Number.isFinite(t) ? -t : t < 0 ? null : 0, stage: null, stages: null };
+    }
+
+    const n = sz.stages, interval = sz.intervalMin * 60_000, shrinkMs = sz.shrinkSec * 1000;
+    const r = (i: number) => r0 + (rf - r0) * (i / n);
+    if (t < 0) return { radius: r0, shrinking: false, next: r(1), nextInMs: Number.isFinite(t) ? -t : null, stage: 1, stages: n };
+    const k = Math.floor(t / interval);
+    if (k >= n) return { radius: rf, shrinking: false, next: null, nextInMs: null, stage: null, stages: n };
+    const u = t - k * interval;
+    if (u < shrinkMs) return { radius: r(k) + (r(k + 1) - r(k)) * (u / shrinkMs), shrinking: ph === 'active', next: r(k + 1), nextInMs: 0, stage: k + 1, stages: n };
+    if (k + 1 >= n) return { radius: rf, shrinking: false, next: null, nextInMs: null, stage: null, stages: n };
+    return { radius: r(k + 1), shrinking: false, next: r(k + 2), nextInMs: (k + 1) * interval - t, stage: k + 2, stages: n };
   }
 
   private jailLocation(): LatLng | null {
@@ -278,7 +298,7 @@ export class Game {
     this.pending.clear();
     this.timeline = [];
     this.results = null;
-    this.flags = { finalCountdown: false, shrinking: false, antiCamping: false, warned5: false, warned1: false };
+    this.flags = { finalCountdown: false, shrinkStage: 0, antiCamping: false, warned5: false, warned1: false };
     this.startedAt = this.now();
     this.pausedTotal = 0;
     this.pausedAt = null;
@@ -384,10 +404,14 @@ export class Game {
 
   private announcements(e: number) {
     const left = this.endAt - e;
-    const sz = this.settings.shrinkingZone;
-    if (sz.enabled && !this.flags.shrinking && this.chaseElapsed() >= sz.startAfterMin * 60_000 && sz.startAfterMin * 60_000 < this.durationMs) {
-      this.flags.shrinking = true;
-      this.emit('zone_shrinking', { finalRadiusM: sz.finalRadiusM });
+    // Announce each shrink as it starts (once per stage; smooth zones announce once).
+    const z = this.zoneInfo();
+    if (z.shrinking) {
+      const stage = z.stage ?? 1;
+      if (stage > this.flags.shrinkStage) {
+        this.flags.shrinkStage = stage;
+        this.emit('zone_shrinking', { toRadiusM: Math.round(z.next ?? z.radius), stage: z.stage, stages: z.stages });
+      }
     }
     if (this.finalCountdownActive() && !this.flags.finalCountdown) {
       this.flags.finalCountdown = true;
@@ -676,12 +700,19 @@ export class Game {
         heartbeat,
         jailbreakProgressSec: me.jailHoldSince !== null ? Math.floor((e - me.jailHoldSince) / 1000) : null,
       },
-      zone: {
-        center: this.settings.zone.center,
-        radiusM: Math.round(this.zoneRadius()),
-        finalRadiusM: sz.enabled ? sz.finalRadiusM : null,
-        shrinking: sz.enabled && ph === 'active' && this.chaseElapsed() >= sz.startAfterMin * 60_000 && !ended,
-      },
+      zone: (() => {
+        const z = this.zoneInfo();
+        return {
+          center: this.settings.zone.center,
+          radiusM: Math.round(z.radius),
+          finalRadiusM: sz.enabled ? Math.min(sz.finalRadiusM, this.settings.zone.radiusM) : null,
+          shrinking: z.shrinking && !ended,
+          nextRadiusM: ended || z.next === null ? null : Math.round(z.next),
+          nextShrinkInSec: ended || z.nextInMs === null ? null : Math.ceil(z.nextInMs / 1000),
+          stage: ended ? null : z.stage,
+          stages: z.stages,
+        };
+      })(),
       jail: jail ? { location: jail, radiusM: this.settings.jail.radiusM } : null,
       timers: {
         headStartLeftSec: ph === 'headstart' ? Math.max(0, Math.ceil((this.headStartMs - e) / 1000)) : null,

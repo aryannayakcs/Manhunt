@@ -18,7 +18,7 @@ export const SETTINGS: Settings = {
   finalCountdown: { enabled: true, lastMin: 3, intervalSec: 30 },
   heartbeat: { enabled: true, distancesM: [80, 50, 25] },
   zone: { center: CENTER, radiusM: 200 },
-  shrinkingZone: { enabled: false, startAfterMin: 5, finalRadiusM: 80 },
+  shrinkingZone: { enabled: false, style: 'stages', startAfterMin: 5, finalRadiusM: 80, stages: 3, intervalMin: 4, shrinkSec: 60 },
   caughtMode: 'jail',
   jail: { location: null, radiusM: 15, holdSec: 5, immunitySec: 10 },
   runnerView: 'map',
@@ -92,7 +92,8 @@ export function game(o: GameOpts = {}): GameState {
     },
     zone: {
       center: settings.zone.center, radiusM: settings.zone.radiusM,
-      finalRadiusM: settings.shrinkingZone.enabled ? settings.shrinkingZone.finalRadiusM : null, shrinking: false, ...o.zone,
+      finalRadiusM: settings.shrinkingZone.enabled ? settings.shrinkingZone.finalRadiusM : null, shrinking: false,
+      nextRadiusM: null, nextShrinkInSec: null, stage: null, stages: null, ...o.zone,
     },
     jail: settings.caughtMode === 'jail' && settings.zone.center ? { location: settings.jail.location ?? settings.zone.center, radiusM: settings.jail.radiusM } : null,
     timers: {

@@ -77,7 +77,8 @@ export function ChaserView({ s, headStart, initialPick = false }: { s: GameState
         <div className="pill"><small>Free</small>{free.length}/{Math.max(total, free.length)}</div>
       </div>
       {t.finalCountdownActive && <div className="banner danger">⚠ Final countdown. Updates are faster.</div>}
-      <Map zone={s.zone} finalRadiusM={s.zone.shrinking || s.zone.finalRadiusM ? s.zone.finalRadiusM : null} jail={s.jail} markers={markers} circles={circles} fit />
+      <ZoneBar s={s} />
+      <Map zone={s.zone} finalRadiusM={s.zone.nextRadiusM} jail={s.jail} markers={markers} circles={circles} fit />
       <HuntList s={s} />
       {pc && <div className="card center" style={{ flex: 'none' }}><div className="lbl">Waiting for {target?.name} to confirm…</div><div className="timer sm">auto in {pc.autoAcceptInSec} s</div></div>}
       <button className="btn chaser" style={{ minHeight: 68, fontSize: 28 }} disabled={!!pc || free.length === 0} onClick={() => setPick(true)}>Catch</button>
@@ -94,6 +95,19 @@ export function ChaserView({ s, headStart, initialPick = false }: { s: GameState
           <button className="btn ghost" onClick={() => setPick(false)}>Cancel</button>
         </div>
       )}
+    </div>
+  );
+}
+
+const fmtM = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`);
+/** Shrinking zone: countdown to the next shrink, or "shrinking now". Dashed circle on the map = next size. */
+function ZoneBar({ s }: { s: GameState }) {
+  const z = s.zone;
+  if (!s.settings.shrinkingZone.enabled || z.nextRadiusM == null || z.nextShrinkInSec == null) return null;
+  const stage = z.stage && z.stages ? ` · ${z.stage}/${z.stages}` : '';
+  return (
+    <div className={`zonebar ${z.shrinking ? 'on' : ''}`}>
+      {z.shrinking ? `◎ Zone shrinking to ${fmtM(z.nextRadiusM)}${stage}` : `◎ Zone shrinks to ${fmtM(z.nextRadiusM)} in ${fmtTime(z.nextShrinkInSec)}${stage}`}
     </div>
   );
 }
@@ -163,7 +177,8 @@ export function RunnerView({ s, headStart }: { s: GameState; headStart: boolean 
       </div>
       {headStart && <div className="banner info" style={{ justifyContent: 'center' }}>Run and hide! Chasers released in {fmtTime(t.headStartLeftSec)}</div>}
 
-      {view === 'map' && <Map zone={s.zone} finalRadiusM={s.zone.finalRadiusM} jail={s.jail} markers={[...youMk(s, 'var(--runner)'), ...chaserMks(s)]} dim fit follow={null} />}
+      <ZoneBar s={s} />
+      {view === 'map' && <Map zone={s.zone} finalRadiusM={s.zone.nextRadiusM} jail={s.jail} markers={[...youMk(s, 'var(--runner)'), ...chaserMks(s)]} dim fit follow={null} />}
       {view === 'none' ? (
         <div className="grow" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 18 }}>
           <Danger level={level} big />
@@ -209,7 +224,8 @@ export function JailedView({ s }: { s: GameState }) {
       <div className="disp" style={{ fontSize: 44, color: 'var(--warn)' }}>You&apos;re in jail</div>
       <p className="mut">Walk to the jail and wait for a teammate to free you.</p>
       {s.jail && s.you.location && <div className="banner warn" style={{ justifyContent: 'center' }}>⛓ Jail is {Math.round(distM(s.you.location, s.jail.location))} m away</div>}
-      <Map zone={s.zone} jail={s.jail} markers={[...youMk(s, 'var(--runner)'), ...chaserMks(s)]} dim fit />
+      <ZoneBar s={s} />
+      <Map zone={s.zone} finalRadiusM={s.zone.nextRadiusM} jail={s.jail} markers={[...youMk(s, 'var(--runner)'), ...chaserMks(s)]} dim fit />
       <div className="row wrap" style={{ flex: 'none' }}>
         {mates.map((p) => <div key={p.id} className="player" style={{ width: 'auto', minHeight: 44, padding: '4px 10px' }}><Avatar p={p} size="sm" /><span>{p.name}</span><Tag2 p={p} /></div>)}
       </div>
@@ -232,7 +248,7 @@ export function SpectatorView({ s }: { s: GameState }) {
   return (
     <div className="scr" style={{ gap: 10 }}>
       <div className="top"><span className="tag o">Spectating</span><div className="pill" style={{ fontSize: 20 }}>{fmtTime(s.timers.gameLeftSec)}</div></div>
-      <Map zone={s.zone} finalRadiusM={s.zone.finalRadiusM} jail={s.jail} markers={markers} circles={circles} fit />
+      <Map zone={s.zone} finalRadiusM={s.zone.nextRadiusM} jail={s.jail} markers={markers} circles={circles} fit />
       <div className="row wrap" style={{ flex: 'none' }}>
         <span className="lbl">Still free:</span>
         {free.length === 0 ? <span className="mut">nobody</span> : free.map((p) => <span key={p.id} className="pill">{p.avatar} {p.name}</span>)}
