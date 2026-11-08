@@ -61,6 +61,8 @@ export interface PublicPlayer {
   connected: boolean;
   /** Seconds left of post-jailbreak immunity, 0 if none. */
   immuneSec: number;
+  /** In a game and their phone hasn't sent a location for 30+ s (locked, closed, or no signal). */
+  gpsLost: boolean;
 }
 
 /** A runner as a chaser sees them on the map. */
@@ -72,7 +74,7 @@ export interface RunnerMarker {
   /** 0 when exact. */
   radiusM: number;
   exact: boolean;
-  reason: 'scheduled' | 'live' | 'out_of_zone' | 'anti_camping';
+  reason: 'scheduled' | 'live' | 'out_of_zone' | 'anti_camping' | 'signal_lost';
   /** Seconds since this location was revealed. */
   ageSec: number;
 }
@@ -140,8 +142,6 @@ export interface GameState {
     revealedForLeavingZone: boolean;
     /** Runners only, heartbeat enabled: 0 = nobody near, 1 = far, 2 = medium, 3 = near. */
     heartbeat: number | null;
-    /** Runners only, runnerView = compass: bearing in degrees to the nearest chaser. */
-    compassBearing: number | null;
     /** Seconds you've stood in jail toward a jailbreak, null when not in jail. */
     jailbreakProgressSec: number | null;
   };
@@ -182,7 +182,7 @@ export type EventName =
   | 'locations_updated' | 'you_were_revealed'
   | 'final_countdown' | 'zone_shrinking' | 'anti_camping'
   | 'time_warning'
-  | 'out_of_zone' | 'back_in_zone' | 'revealed_for_leaving_zone'
+  | 'out_of_zone' | 'back_in_zone' | 'revealed_for_leaving_zone' | 'signal_lost'
   | 'catch_request' | 'catch_disputed' | 'catch_rejected'
   | 'player_caught' | 'player_infected' | 'player_jailed' | 'jailbreak'
   | 'game_over' | 'back_to_lobby';

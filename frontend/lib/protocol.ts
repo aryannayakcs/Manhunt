@@ -16,8 +16,9 @@ export interface Settings {
   shrinkingZone: { enabled: boolean; startAfterMin: number; finalRadiusM: number };
   caughtMode: 'out' | 'infection' | 'jail';
   jail: { location: LatLng | null; radiusM: number; holdSec: number; immunitySec: number };
-  runnerView: 'map' | 'compass' | 'none';
+  runnerView: 'map' | 'none';
   announcements: boolean;
+  visibility: { runnersSeeChasers: boolean; chasersSeeChasers: boolean };
   antiCamping: { enabled: boolean; afterMin: number };
   outOfZone: { graceSec: number };
   catching: { radiusM: number; autoAcceptSec: number };
@@ -25,11 +26,11 @@ export interface Settings {
 
 export interface PublicPlayer {
   id: string; name: string; color: string; avatar?: string;
-  role: Role; status: Status; isHost: boolean; connected: boolean; immuneSec: number;
+  role: Role; status: Status; isHost: boolean; connected: boolean; immuneSec: number; gpsLost: boolean;
 }
 export interface RunnerMarker {
   playerId: string; lat: number; lng: number; radiusM: number; exact: boolean;
-  reason: 'scheduled' | 'live' | 'out_of_zone' | 'anti_camping'; ageSec: number;
+  reason: 'scheduled' | 'live' | 'out_of_zone' | 'anti_camping' | 'signal_lost'; ageSec: number;
 }
 export interface LiveMarker { playerId: string; lat: number; lng: number; accuracy: number }
 export interface PendingCatch { catchId: string; chaserId: string; runnerId: string; autoAcceptInSec: number }
@@ -52,7 +53,7 @@ export interface GameState {
   you: {
     id: string; role: Role; status: Status; isHost: boolean; location: LiveMarker | null;
     inZone: boolean | null; outOfZoneRevealInSec: number | null; revealedForLeavingZone: boolean;
-    heartbeat: number | null; compassBearing: number | null; jailbreakProgressSec: number | null;
+    heartbeat: number | null; jailbreakProgressSec: number | null;
   };
   zone: { center: LatLng | null; radiusM: number; finalRadiusM: number | null; shrinking: boolean };
   jail: { location: LatLng; radiusM: number } | null;
@@ -66,7 +67,7 @@ export type EventName =
   | 'player_joined' | 'player_left' | 'player_kicked' | 'host_changed'
   | 'game_started' | 'head_start_over' | 'paused' | 'resumed'
   | 'locations_updated' | 'you_were_revealed' | 'final_countdown' | 'zone_shrinking' | 'anti_camping'
-  | 'time_warning' | 'out_of_zone' | 'back_in_zone' | 'revealed_for_leaving_zone'
+  | 'time_warning' | 'out_of_zone' | 'back_in_zone' | 'revealed_for_leaving_zone' | 'signal_lost'
   | 'catch_request' | 'catch_disputed' | 'catch_rejected'
   | 'player_caught' | 'player_infected' | 'player_jailed' | 'jailbreak'
   | 'game_over' | 'back_to_lobby';

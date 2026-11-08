@@ -66,10 +66,18 @@ export const SettingsSchema = z.object({
     /** Seconds freed runners can't be caught after a jailbreak. */
     immunitySec: z.number().int().min(0).max(120),
   }),
-  /** What a runner's screen shows. */
-  runnerView: z.enum(['map', 'compass', 'none']),
+  /** What a runner's screen shows: their own map, or nothing but the timer and danger warning.
+   *  Runners are never told which direction a chaser is in. */
+  runnerView: z.enum(['map', 'none']),
   /** Frontend should play sounds / voice lines for events when true. */
   announcements: z.boolean(),
+  /** Who sees chasers' live positions on their map. */
+  visibility: z.object({
+    /** Runners see where chasers are (needs runnerView = map). */
+    runnersSeeChasers: z.boolean(),
+    /** Chasers see their teammates. */
+    chasersSeeChasers: z.boolean(),
+  }),
   /** If nobody is caught for N minutes, the next update is exact even when fuzzy is on. */
   antiCamping: z.object({
     enabled: z.boolean(),
@@ -102,6 +110,7 @@ export const DEFAULT_SETTINGS: Settings = {
   jail: { location: null, radiusM: 15, holdSec: 5, immunitySec: 10 },
   runnerView: 'map',
   announcements: true,
+  visibility: { runnersSeeChasers: false, chasersSeeChasers: true },
   antiCamping: { enabled: false, afterMin: 6 },
   outOfZone: { graceSec: 15 },
   catching: { radiusM: 15, autoAcceptSec: 15 },

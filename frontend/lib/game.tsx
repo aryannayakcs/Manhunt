@@ -29,7 +29,6 @@ export interface Ctx {
   accuracy: number | null;
   ready: boolean;
   makeReady: () => Promise<void>;
-  heading: number;
   kicked: boolean;
   clearKicked: () => void;
   pendingCode: string | null;
@@ -65,7 +64,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [geo, setGeo] = useState<Geo>('idle');
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
-  const [heading, setHeading] = useState(0);
   const [kicked, setKicked] = useState(false);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
 
@@ -134,6 +132,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       case 'time_warning': toast(`${d.minutesLeft} minute${d.minutesLeft === 1 ? '' : 's'} left`, 'warn'); say(`${d.minutesLeft} minute${d.minutesLeft === 1 ? '' : 's'} left`); break;
       case 'out_of_zone': sfx.alarm(); buzz([400, 200, 400]); break;
       case 'back_in_zone': sfx.clear(); toast('Back in the zone'); break;
+      case 'signal_lost': sfx.ping(); toast(cap(`${nameOf(d.playerId)}'s phone went dark. Last spot revealed!`), 'danger'); break;
       case 'revealed_for_leaving_zone': toast(cap(`${nameOf(d.playerId)} left the zone. Location revealed!`), 'danger'); break;
       case 'catch_request': if (d.runnerId === me?.id) { sfx.alarm(); buzz([300, 100, 300, 100, 300]); } break;
       case 'catch_disputed': toast(cap(`${nameOf(d.runnerId)} disputed the catch`), 'warn'); break;
@@ -204,6 +203,23 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(id);
   }, [sendFix]);
 
+  // Coming back after the phone was locked / Safari was in the background: tell runners what happened.
+  const hiddenAt = useRef<number | null>(null);
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') { hiddenAt.current = Date.now(); return; }
+      const away = hiddenAt.current ? Date.now() - hiddenAt.current : 0;
+      hiddenAt.current = null;
+      sendFix();
+      const st = stateRef.current;
+      if (away > 25000 && st?.phase === 'active' && st.you.role === 'runner' && st.you.status === 'free') {
+        doFlash('revealed', 'Your phone stopped sharing your location, so chasers saw your last spot. Keep this screen open!', 7000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [sendFix, doFlash]);
+
   const startGeo = useCallback(() => {
     if (watchId.current != null || !('geolocation' in navigator)) return;
     watchId.current = navigator.geolocation.watchPosition(
@@ -236,14 +252,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
     unlockAudio();
     startGeo();
     await keepAwake();
-    try {
-      const DOE = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
-      if (typeof DOE?.requestPermission === 'function') await DOE.requestPermission();
-    } catch {}
-    const onAbs = (e: DeviceOrientationEvent) => { if (e.alpha != null) setHeading(360 - e.alpha); };
-    const onIos = (e: DeviceOrientationEvent) => { const w = (e as unknown as { webkitCompassHeading?: number }).webkitCompassHeading; if (w != null) setHeading(w); };
-    window.addEventListener('deviceorientationabsolute', onAbs as EventListener);
-    window.addEventListener('deviceorientation', onIos as EventListener);
     setReady(true);
   }, [startGeo, keepAwake]);
 
@@ -274,8 +282,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     conn, waking, state, profile, setProfile, send, createGame, joinGame, leave,
     error, clearError: () => setError(null), toasts, flash, clearFlash: () => setFlash(null),
-    geo, accuracy, ready, makeReady, heading, kicked, clearKicked: () => setKicked(false), pendingCode, notify: toast,
-  }), [toast, conn, waking, state, profile, setProfile, send, createGame, joinGame, leave, error, toasts, flash, geo, accuracy, ready, makeReady, heading, kicked, pendingCode]);
+    geo, accuracy, ready, makeReady, kicked, clearKicked: () => setKicked(false), pendingCode, notify: toast,
+  }), [toast, conn, waking, state, profile, setProfile, send, createGame, joinGame, leave, error, toasts, flash, geo, accuracy, ready, makeReady, kicked, pendingCode]);
 
   return <GameCtx.Provider value={value}>{children}</GameCtx.Provider>;
 }

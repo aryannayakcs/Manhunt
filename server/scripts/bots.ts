@@ -13,6 +13,7 @@
  *   --start                        host bot starts the game once everyone has joined
  *   --fast                         short test settings (20 s head start, 3 min game, 15 s updates)
  *   --mode out|infection|jail      what happens when caught
+ *   --stats                        measure lag: update rate, longest gap, round-trip time, message size
  */
 import { WebSocket } from 'ws';
 import { offsetPoint, distanceM, bearingDeg } from '../src/geo.ts';
@@ -28,6 +29,9 @@ const CREATE = flag('create');
 const START = flag('start');
 const FAST = flag('fast');
 const MODE = opt('mode', 'out');
+const STATS = flag('stats');
+/** Lag measurements across all bots (only during the chase). */
+const stats = { states: 0, bytes: 0, maxGapMs: 0, gaps: [] as number[], rtts: [] as number[] };
 const CENTER = { lat: Number(opt('lat', '40.7829')), lng: Number(opt('lng', '-73.9654')) };
 let code = opt('code')?.toUpperCase();
 
@@ -40,6 +44,8 @@ class Bot {
   ws!: WebSocket;
   id = '';
   state: GameState | null = null;
+  lastStateAt = 0;
+  pingSentAt = 0;
   pos = offsetPoint(CENTER, Math.random() * 120, Math.random() * 360);
   heading = Math.random() * 360;
   name: string;
@@ -53,7 +59,17 @@ class Bot {
       this.ws.on('message', (raw) => {
         const msg = JSON.parse(raw.toString()) as ServerMessage;
         if (msg.type === 'joined') { this.id = msg.playerId; code = msg.code; resolve(); }
-        else if (msg.type === 'state') this.state = msg.state;
+        else if (msg.type === 'state') {
+          const now = Date.now();
+          if (STATS && msg.state.phase === 'active' && this.state?.phase === 'active') {
+            const gap = now - this.lastStateAt;
+            stats.states++; stats.bytes += raw.toString().length; stats.gaps.push(gap);
+            if (gap > stats.maxGapMs) stats.maxGapMs = gap;
+          }
+          this.lastStateAt = now;
+          this.state = msg.state;
+        }
+        else if (msg.type === 'pong' && this.pingSentAt) { stats.rtts.push(Date.now() - this.pingSentAt); this.pingSentAt = 0; }
         else if (msg.type === 'error') console.log(`  [${this.name}] error ${msg.code}: ${msg.message}`);
         else if (msg.type === 'event') this.onEvent(msg.event, msg.data ?? {});
       });
@@ -132,6 +148,18 @@ if (CREATE) {
 }
 
 setInterval(() => bots.forEach(b => b.step()), 1000);
+if (STATS) setInterval(() => bots.forEach(b => { b.pingSentAt = Date.now(); b.send({ type: 'ping' }); }), 3000);
+
+function printStats() {
+  if (!STATS || !stats.states) return;
+  const sorted = [...stats.gaps].sort((a, b) => a - b);
+  const rt = [...stats.rtts].sort((a, b) => a - b);
+  const pct = (arr: number[], p: number) => arr[Math.min(arr.length - 1, Math.floor(arr.length * p))];
+  console.log(`\nLAG REPORT (${COUNT} players, chase phase)`);
+  console.log(`  updates received:      ${stats.states} (avg gap ${Math.round(sorted.reduce((a, b) => a + b, 0) / sorted.length)} ms, 99th pct ${pct(sorted, 0.99)} ms, worst ${stats.maxGapMs} ms; server sends 1/s)`);
+  console.log(`  round trip to server:  median ${pct(rt, 0.5)} ms, 95th pct ${pct(rt, 0.95)} ms, worst ${rt[rt.length - 1]} ms`);
+  console.log(`  update size:           ${Math.round(stats.bytes / stats.states / 1024 * 10) / 10} KB each (~${Math.round(stats.bytes / stats.states / 1024 * 10) / 10} KB/s per phone)`);
+}
 
 // Print a one-line status every 10 seconds and exit when the game ends.
 let printedResults = false;
@@ -145,6 +173,7 @@ setInterval(() => {
     printedResults = true;
     console.log(`\nGAME OVER: ${s.results.winner} win (${s.results.reason})`);
     for (const a of s.results.awards) console.log(`  ${a.title}: ${s.players.find(p => p.id === a.playerId)?.name} (${a.value})`);
+    printStats();
     if (CREATE) setTimeout(() => process.exit(0), 500);
   }
 }, 10_000);

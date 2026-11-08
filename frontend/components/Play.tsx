@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useGame } from '@/lib/game';
 import type { GameState, PublicPlayer } from '@/lib/protocol';
 import { sfx } from '@/lib/sound';
@@ -9,6 +9,11 @@ import { Avatar, Ring } from './ui';
 
 const byId = (s: GameState, id: string) => s.players.find((p) => p.id === id);
 const youMk = (s: GameState, color: string): Mk[] => (s.you.location ? [{ id: 'you', lat: s.you.location.lat, lng: s.you.location.lng, color, kind: 'you' }] : []);
+/** Chasers the server lets this player see (other chasers, or everyone when runners may see chasers). */
+const chaserMks = (s: GameState): Mk[] => s.map.chasers.filter((c) => c.playerId !== s.you.id).map((c) => {
+  const p = byId(s, c.playerId);
+  return { id: `c-${c.playerId}`, lat: c.lat, lng: c.lng, color: p?.color ?? '#ff5a2c', kind: 'tri', label: p?.name };
+});
 const freeRunners = (s: GameState) => s.players.filter((p) => p.role === 'runner' && p.status === 'free');
 
 export function RoleReveal({ role, headStartSec, onDone }: { role: 'chaser' | 'runner'; headStartSec: number | null; onDone: () => void }) {
@@ -46,15 +51,12 @@ export function ChaserView({ s, headStart, initialPick = false }: { s: GameState
 
   const markers: Mk[] = [...youMk(s, 'var(--chaser)')];
   const circles: Circle[] = [];
-  for (const c of s.map.chasers) {
-    if (c.playerId === s.you.id) continue;
-    const p = byId(s, c.playerId);
-    markers.push({ id: `c-${c.playerId}`, lat: c.lat, lng: c.lng, color: p?.color ?? '#b57bff', kind: 'tri', label: p?.name });
-  }
+  markers.push(...chaserMks(s));
   for (const r of s.map.runners) {
     const p = byId(s, r.playerId); const color = p?.color ?? '#1fe3b4';
     const op = Math.max(0.3, 1 - r.ageSec / 300);
-    if (r.exact) markers.push({ id: `rx-${r.playerId}`, lat: r.lat, lng: r.lng, color, kind: 'dot', label: p?.name, sub: r.reason === 'out_of_zone' ? 'LEFT ZONE' : fmtAge(r.ageSec), subBad: r.reason === 'out_of_zone', opacity: op });
+    const flag = r.reason === 'out_of_zone' ? 'LEFT ZONE' : r.reason === 'signal_lost' ? '📵 PHONE OFF' : null;
+    if (r.exact) markers.push({ id: `rx-${r.playerId}`, lat: r.lat, lng: r.lng, color, kind: 'dot', label: p?.name, sub: flag ?? fmtAge(r.ageSec), subBad: !!flag, opacity: flag ? 1 : op });
     else {
       circles.push({ id: r.playerId, lat: r.lat, lng: r.lng, radiusM: r.radiusM, color, opacity: op });
       markers.push({ id: `rf-${r.playerId}`, lat: r.lat, lng: r.lng, color, kind: 'label', label: p?.name, sub: fmtAge(r.ageSec), opacity: op });
@@ -76,6 +78,7 @@ export function ChaserView({ s, headStart, initialPick = false }: { s: GameState
       </div>
       {t.finalCountdownActive && <div className="banner danger">⚠ Final countdown. Updates are faster.</div>}
       <Map zone={s.zone} finalRadiusM={s.zone.shrinking || s.zone.finalRadiusM ? s.zone.finalRadiusM : null} jail={s.jail} markers={markers} circles={circles} fit />
+      <HuntList s={s} />
       {pc && <div className="card center" style={{ flex: 'none' }}><div className="lbl">Waiting for {target?.name} to confirm…</div><div className="timer sm">auto in {pc.autoAcceptInSec} s</div></div>}
       <button className="btn chaser" style={{ minHeight: 68, fontSize: 28 }} disabled={!!pc || free.length === 0} onClick={() => setPick(true)}>Catch</button>
       {pick && (
@@ -95,7 +98,37 @@ export function ChaserView({ s, headStart, initialPick = false }: { s: GameState
   );
 }
 
+/** Everyone the chaser is hunting, with when each was last seen. */
+function HuntList({ s }: { s: GameState }) {
+  const list = freeRunners(s);
+  if (!list.length) return null;
+  return (
+    <div className="strip" aria-label="Runners still free">
+      {list.map((p) => {
+        const r = s.map.runners.find((x) => x.playerId === p.id);
+        const st = p.gpsLost ? '📵 phone off' : r?.reason === 'out_of_zone' ? 'left zone' : r ? fmtAge(r.ageSec) : 'not seen yet';
+        return (
+          <span key={p.id} className="chip" style={{ '--c': p.color } as CSSProperties}>
+            <Avatar p={p} size="sm" /><b>{p.name}</b><small className={p.gpsLost || r?.reason === 'out_of_zone' ? 'bad' : ''}>{st}</small>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ---------------- Runner ---------------- */
+const DANGER = ['All quiet', 'A chaser is nearby', 'A chaser is close', 'A chaser is very, very near'];
+/** Pulsing danger warning. Says how close, never where. */
+function Danger({ level, big = false }: { level: number; big?: boolean }) {
+  return (
+    <>
+      <div className="heart">{[1, 2, 3].map((i) => <i key={i} className={level >= i ? `on${i}` : ''} />)}</div>
+      <div className={`alert l${level}`} style={{ fontSize: big ? (level === 3 ? 58 : 46) : 28 }} role="status">{DANGER[level]}</div>
+      {big && level === 3 && <p className="center mut">Stay hidden. Don&apos;t move.</p>}
+    </>
+  );
+}
 function useHeartbeat(level: number) {
   useEffect(() => {
     if (!level) return;
@@ -107,7 +140,7 @@ function useHeartbeat(level: number) {
 }
 
 export function RunnerView({ s, headStart }: { s: GameState; headStart: boolean }) {
-  const { send, heading } = useGame();
+  const { send } = useGame();
   const y = s.you; const t = s.timers;
   const hb = s.settings.heartbeat.enabled ? y.heartbeat ?? 0 : 0;
   useHeartbeat(headStart ? 0 : hb);
@@ -116,9 +149,7 @@ export function RunnerView({ s, headStart }: { s: GameState; headStart: boolean 
   const me = byId(s, y.id);
   const pc = s.pendingCatch && s.pendingCatch.runnerId === y.id ? s.pendingCatch : null;
   const chaser = pc ? byId(s, pc.chaserId) : null;
-  const rot = y.compassBearing != null ? (y.compassBearing - heading + 360) % 360 : 0;
   const free = freeRunners(s).length;
-  const col = ['var(--tx3)', 'var(--warn)', '#ff7a2c', 'var(--danger)'][level];
 
   return (
     <div className="scr runner dim" style={{ gap: 10 }}>
@@ -132,21 +163,12 @@ export function RunnerView({ s, headStart }: { s: GameState; headStart: boolean 
       </div>
       {headStart && <div className="banner info" style={{ justifyContent: 'center' }}>Run and hide! Chasers released in {fmtTime(t.headStartLeftSec)}</div>}
 
-      {view === 'map' && <Map zone={s.zone} finalRadiusM={s.zone.finalRadiusM} jail={s.jail} markers={youMk(s, 'var(--runner)')} dim fit follow={null} />}
-      {view === 'compass' && (
-        <div className="mapbox" style={{ display: 'grid', placeItems: 'center' }}>
-          <svg viewBox="0 0 200 200" width="260" role="img" aria-label="Compass to nearest chaser">
-            <circle cx="100" cy="100" r="92" fill="none" stroke="#262d30" strokeWidth="3" />
-            <g style={{ transform: `rotate(${-heading}deg)`, transformOrigin: '100px 100px', transition: 'transform .3s' }}><text x="100" y="22" textAnchor="middle" fill="#55616b" fontSize="13" fontWeight="700">N</text></g>
-            {y.compassBearing != null ? <g style={{ transform: `rotate(${rot}deg)`, transformOrigin: '100px 100px', transition: 'transform .3s' }}><path d="M100 24 L132 110 L100 96 L68 110 Z" fill="#ff2d4f" /></g>
-              : <text x="100" y="106" textAnchor="middle" fill="#55616b" fontSize="14">no chaser data</text>}
-          </svg>
+      {view === 'map' && <Map zone={s.zone} finalRadiusM={s.zone.finalRadiusM} jail={s.jail} markers={[...youMk(s, 'var(--runner)'), ...chaserMks(s)]} dim fit follow={null} />}
+      {view === 'none' ? (
+        <div className="grow" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 18 }}>
+          <Danger level={level} big />
         </div>
-      )}
-      {view === 'none' && <div className="grow" />}
-
-      <div className="heart">{[1, 2, 3].map((i) => <i key={i} className={level >= i ? `on${i}` : ''} />)}</div>
-      <div className="disp center" style={{ fontSize: 26, color: col, flex: 'none' }}>{['All quiet', 'Chaser nearby', 'Chaser close', 'Chaser VERY close'][level]}</div>
+      ) : <Danger level={level} />}
       <p className="hint">Keep this screen open · lower your brightness</p>
 
       {y.jailbreakProgressSec != null && y.jailbreakProgressSec > 0 && s.jail && (
@@ -187,7 +209,7 @@ export function JailedView({ s }: { s: GameState }) {
       <div className="disp" style={{ fontSize: 44, color: 'var(--warn)' }}>You&apos;re in jail</div>
       <p className="mut">Walk to the jail and wait for a teammate to free you.</p>
       {s.jail && s.you.location && <div className="banner warn" style={{ justifyContent: 'center' }}>⛓ Jail is {Math.round(distM(s.you.location, s.jail.location))} m away</div>}
-      <Map zone={s.zone} jail={s.jail} markers={youMk(s, 'var(--runner)')} dim fit />
+      <Map zone={s.zone} jail={s.jail} markers={[...youMk(s, 'var(--runner)'), ...chaserMks(s)]} dim fit />
       <div className="row wrap" style={{ flex: 'none' }}>
         {mates.map((p) => <div key={p.id} className="player" style={{ width: 'auto', minHeight: 44, padding: '4px 10px' }}><Avatar p={p} size="sm" /><span>{p.name}</span><Tag2 p={p} /></div>)}
       </div>

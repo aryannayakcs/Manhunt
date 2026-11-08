@@ -143,3 +143,29 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 /* buttons side by side share the row instead of overflowing it */
 .row>.btn{width:auto;flex:1 1 0;min-width:0;padding:0 8px}
 .player[disabled]{opacity:.45}
+
+/* names on the map: readable pills */
+.mk b{background:#000d;border:1.5px solid var(--c);border-radius:9px;padding:1px 7px;font-size:13px;line-height:1.35;margin-bottom:2px;white-space:nowrap}
+.mk b:empty{display:none}
+.mk em{background:#000a;border-radius:6px;padding:0 4px;margin-top:2px}
+/* who the chaser is hunting */
+.strip{display:flex;gap:6px;overflow-x:auto;flex:none;padding-bottom:2px;scrollbar-width:none}
+.chip{display:flex;align-items:center;gap:6px;background:var(--s1);border:1px solid var(--line);border-left:3px solid var(--c);border-radius:12px;padding:4px 10px 4px 4px;white-space:nowrap;flex:none}
+.chip b{font-size:14px}
+.chip small{color:var(--tx2);font-size:11px}
+.chip small.bad{color:var(--danger);font-weight:700}
+/* runner danger warning: pulses faster the closer a chaser is */
+.alert{font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.03em;text-align:center;line-height:.95;flex:none;color:var(--tx3)}
+.alert.l1{color:var(--warn);animation:beat 1.4s infinite}
+.alert.l2{color:#ff7a2c;animation:beat .9s infinite}
+.alert.l3{color:var(--danger);animation:beat .5s infinite}
+.tips{display:flex;flex-direction:column;gap:6px;flex:none}
+.tips ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--tx)}
+.mk i.rh{width:30px;height:30px;border-radius:50%;background:#000;border:4px solid #fff;box-shadow:0 0 0 4px var(--runner);cursor:ew-resize}
+.search{display:flex;gap:8px;flex:none;position:relative}
+.search input{flex:1;min-width:0;background:var(--s2);border:2px solid var(--line);border-radius:14px;padding:12px 14px;font:600 16px var(--ui)}
+.search input:focus{border-color:var(--runner)}
+.results{position:absolute;top:56px;left:0;right:0;z-index:20;background:var(--s2);border:1px solid var(--line);border-radius:14px;padding:4px;display:flex;flex-direction:column;max-height:260px;overflow-y:auto;box-shadow:0 12px 30px #000c}
+.results button{text-align:left;padding:10px 12px;border-radius:10px;font-size:14px}
+.results button:active,.results button:hover{background:var(--s3)}
+.results small{display:block;color:var(--tx2);font-size:12px}

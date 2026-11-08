@@ -3,12 +3,12 @@
 // Screens are the real components, so design changes show up here immediately.
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { GameCtx, type Ctx } from '@/lib/game';
-import { CHASER_HINTS, chaserMap, ctx, everyone, game, results } from '@/lib/mock';
+import { CHASER_HINTS, at, chaserMap, ctx, everyone, game, results } from '@/lib/mock';
 import type { GameState } from '@/lib/protocol';
 import { Game, HostMenu, Kicked, Overlays } from './App';
 import { End } from './End';
 import { Character, Home } from './Entry';
-import { Lobby } from './Lobby';
+import { Lobby, LockTips } from './Lobby';
 import { ChaserView, RoleReveal } from './Play';
 
 interface Shot { title: string; desc: string; s?: GameState | null; c?: Partial<Ctx>; host?: boolean; render: (s: GameState) => ReactNode }
@@ -36,6 +36,7 @@ const SECTIONS: Section[] = [
       { title: 'Lobby: host, new game', desc: 'Right after Create game. The host still needs to tap I’m ready and draw the zone.', c: { ready: false }, s: game({ phase: 'lobby', settings: { zone: { center: null, radiusM: 200 } } }), render: (s) => <><Lobby s={s} /><Overlays s={s} /></> },
       { title: 'Lobby: host picks chasers', desc: 'Ready, zone drawn, “Host picks” on: tap players to switch chaser/runner.', s: game({ phase: 'lobby', settings: { chasers: { count: 2, selection: 'host' } }, others: { ava: { role: 'chaser' }, cleo: { role: 'chaser' } } }), render: (s) => <Lobby s={s} /> },
       { title: 'Lobby: a friend’s view', desc: 'Everyone who isn’t the host waits here.', s: game({ phase: 'lobby', me: { isHost: false }, others: { ava: { isHost: true } } }), render: (s) => <Lobby s={s} /> },
+      { title: 'Lock your phone into the game', desc: 'From the lobby button. Guided Access (iPhone) / App pinning (Android) stop the phone from leaving the game or locking.', s: game({ phase: 'lobby' }), render: (s) => <><Lobby s={s} /><LockTips onClose={() => {}} /></> },
       { title: 'Settings', desc: 'Host only. Every rule of the game. Scroll inside the phone to see all of it.', s: game({ phase: 'lobby' }), render: (s) => <Lobby s={s} initialView="settings" /> },
       { title: 'Draw the play zone', desc: 'Host taps the map or drags the handle. With jailbreak on, there’s a jail pin too.', s: game({ phase: 'lobby' }), render: (s) => <Lobby s={s} initialView="zone" /> },
     ],
@@ -52,11 +53,12 @@ const SECTIONS: Section[] = [
   {
     id: 'chaser', title: 'Chaser',
     shots: [
-      { title: 'Chaser map', desc: 'Runners as fuzzy circles (somewhere inside). Eli left the zone, so he shows exactly. Triangles are other chasers.', s: game({ ...chaser, map: chaserMap() }), render: inGame },
+      { title: 'Chaser map', desc: 'Every runner has a name tag: fuzzy circles (they\u2019re somewhere inside), or an exact dot when Eli left the zone. Triangles are other chasers. The strip under the map lists everyone you\u2019re hunting.', s: game({ ...chaser, map: chaserMap() }), render: inGame },
       { title: 'Final countdown', desc: 'Last few minutes: red timer, faster updates.', s: game({ ...chaser, map: chaserMap(), timers: { gameLeftSec: 151, nextUpdateInSec: 12, finalCountdownActive: true } }), render: inGame },
       { title: 'Live locations', desc: 'When the host sets updates to “Live”: exact dots that move in real time.', s: game({ ...chaser, settings: { locationUpdates: { mode: 'live', intervalSec: 120 } }, map: { ...chaserMap(), runners: CHASER_HINTS.map((r) => ({ ...r, radiusM: 0, exact: true, reason: 'live' as const, ageSec: 1 })) } }), render: inGame },
       { title: 'Who did you catch?', desc: 'After tapping Catch. Sorted by who was last seen closest.', s: game({ ...chaser, map: chaserMap() }), render: (s) => <ChaserView s={s} headStart={false} initialPick /> },
       { title: 'Waiting for confirmation', desc: 'The runner has to confirm on their phone. Counts automatically after 15 s.', s: game({ ...chaser, map: chaserMap(), pendingCatch: { catchId: 'c1', chaserId: 'me', runnerId: 'ben', autoAcceptInSec: 11 } }), render: inGame },
+      { title: 'A runner\u2019s phone went dark', desc: 'Dev locked his phone (or closed Safari). After 30 s with no location, chasers see his last spot, tagged PHONE OFF.', c: { toasts: [t(1, 'Dev\u2019s phone went dark. Last spot revealed!', 'danger')] }, s: game({ ...chaser, others: { dev: { gpsLost: true } }, map: { ...chaserMap(), runners: CHASER_HINTS.map((r) => (r.playerId === 'dev' ? { ...r, radiusM: 0, exact: true, reason: 'signal_lost' as const, ageSec: 1 } : r)) } }), render: inGame },
       { title: 'Alerts (toasts)', desc: 'Short messages at the top, e.g. a catch from too far away or new locations.', c: { toasts: [t(1, 'Locations updated'), t(2, 'Too far (42 m). Get closer', 'warn'), t(3, 'Cleo caught Ben!', 'danger')] }, s: game({ ...chaser, map: chaserMap() }), render: inGame },
     ],
   },
@@ -64,10 +66,12 @@ const SECTIONS: Section[] = [
     id: 'runner', title: 'Runner',
     shots: [
       { title: 'Runner map: all quiet', desc: '“What runners see: Map”. Just you, the zone and the jail. Screen is dimmed so it doesn’t give away your hiding spot.', s: game({ ...runner }), render: inGame },
+      { title: 'Runner map: chasers visible', desc: 'Setting \u201cRunners see chasers\u201d on: runners see every chaser live (triangles).', s: game({ ...runner, settings: { visibility: { runnersSeeChasers: true, chasersSeeChasers: true } }, you: { heartbeat: 1 }, map: { chasers: [{ playerId: 'ava', ...at(25, -20), accuracy: 6 }, { playerId: 'cleo', ...at(-100, -80), accuracy: 6 }] } }), render: inGame },
       { title: 'Runner map: chaser close', desc: 'Heartbeat warning: red pulsing edges and a heartbeat sound. Gets faster as chasers get closer.', s: game({ ...runner, you: { heartbeat: 2 } }), render: inGame },
-      { title: 'Compass view', desc: '“What runners see: Compass”. Arrow points at the nearest chaser (no distance).', c: { heading: 0 }, s: game({ ...runner, settings: { runnerView: 'compass' }, you: { heartbeat: 3, compassBearing: 215 } }), render: inGame },
-      { title: '“Nothing” view', desc: '“What runners see: Nothing”. Only the timer and danger level.', s: game({ ...runner, settings: { runnerView: 'none' }, you: { heartbeat: 1 } }), render: inGame },
+      { title: '\u201cNothing\u201d view: chaser very near', desc: 'Runners are never told where a chaser is, only how close. The warning pulses faster as they get nearer.', s: game({ ...runner, settings: { runnerView: 'none' }, you: { heartbeat: 3 } }), render: inGame },
+      { title: '“Nothing” view: chaser nearby', desc: '“What runners see: Nothing”. Just the timer and the danger warning.', s: game({ ...runner, settings: { runnerView: 'none' }, you: { heartbeat: 1 } }), render: inGame },
       { title: 'Your location was sent', desc: 'Flashes every time chasers get an update about you.', c: { flash: { id: 1, kind: 'revealed', text: 'Your location was just sent to the chasers' } }, s: game({ ...runner }), render: inGame },
+      { title: 'Back after locking the phone', desc: 'A runner whose phone was locked for 30+ s is told chasers saw their last spot.', c: { flash: { id: 1, kind: 'revealed', text: 'Your phone stopped sharing your location, so chasers saw your last spot. Keep this screen open!' } }, s: game({ ...runner }), render: inGame },
       { title: 'Catch request', desc: 'A chaser says they tagged you. Confirm or dispute.', s: game({ ...runner, you: { heartbeat: 3 }, pendingCatch: { catchId: 'c1', chaserId: 'ava', runnerId: 'me', autoAcceptInSec: 12 } }), render: inGame },
       { title: 'Left the zone', desc: 'Countdown before chasers can see you.', s: game({ ...runner, you: { inZone: false, outOfZoneRevealInSec: 9 } }), render: inGame },
       { title: 'Revealed for leaving', desc: 'Stayed out too long: chasers see your exact location until you return.', s: game({ ...runner, you: { inZone: false, revealedForLeavingZone: true } }), render: inGame },
@@ -106,15 +110,20 @@ const SECTIONS: Section[] = [
   },
 ];
 
+const ALL = SECTIONS.flatMap((x) => x.shots);
+const numberOf = (shot: Shot) => ALL.indexOf(shot) + 1;
+
 /** Only mounts a screen while it's near the viewport (each map uses graphics memory). */
-function Phone({ shot, n }: { shot: Shot; n: number }) {
+function Phone({ shot, n, eager }: { shot: Shot; n: number; eager: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [vis, setVis] = useState(false);
+  const [seen, setVis] = useState(false);
+  const vis = eager || seen;
   useEffect(() => {
+    if (eager) return;
     const io = new IntersectionObserver(([e]) => setVis(e.isIntersecting), { rootMargin: '500px 0px' });
     if (ref.current) io.observe(ref.current);
     return () => io.disconnect();
-  }, []);
+  }, [eager]);
   const s = shot.s ?? null;
   return (
     <figure className="g-item" id={`screen-${n}`}>
@@ -128,6 +137,12 @@ function Phone({ shot, n }: { shot: Shot; n: number }) {
 }
 
 export default function Gallery() {
+  // ?only=16,21 shows just those screens (handy for sharing one screen).
+  const [only, setOnly] = useState<Set<number> | null>(null);
+  useEffect(() => {
+    const v = new URLSearchParams(location.search).get('only');
+    if (v) setOnly(new Set(v.split(',').map(Number).filter(Boolean)));
+  }, []);
   let n = 0;
   return (
     <div className="g">
@@ -138,9 +153,9 @@ export default function Gallery() {
         <nav className="g-nav">{SECTIONS.map((x) => <a key={x.id} href={`#${x.id}`}>{x.title}</a>)}</nav>
       </header>
       {SECTIONS.map((sec) => (
-        <section key={sec.id} id={sec.id} className="g-sec">
+        <section key={sec.id} id={sec.id} className="g-sec" hidden={!!only && !sec.shots.some((x) => only.has(numberOf(x)))}>
           <h2 className="disp">{sec.title}</h2>
-          <div className="g-grid">{sec.shots.map((shot) => { n += 1; return <Phone key={n} shot={shot} n={n} />; })}</div>
+          <div className="g-grid">{sec.shots.map((shot) => { n += 1; return only && !only.has(n) ? null : <Phone key={n} shot={shot} n={n} eager={!!only} />; })}</div>
         </section>
       ))}
     </div>

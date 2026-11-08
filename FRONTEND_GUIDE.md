@@ -109,7 +109,7 @@ Call `keepAwake()` from a button tap (for example "Ready" or "Start"). Show a wa
 ### Head start (`phase === 'headstart'`)
 - Big countdown from `state.timers.headStartLeftSec`.
 - **Chasers:** black out the map. "Close your eyes / stay at the start. Head start ends in 2:41."
-- **Runners:** "Run and hide!" plus their own view (map/compass/none).
+- **Runners:** "Run and hide!" plus their own view (map or nothing).
 
 ### Chaser view (`phase === 'active'`, `you.role === 'chaser'`)
 - Map with:
@@ -129,7 +129,6 @@ Call `keepAwake()` from a button tap (for example "Ready" or "Start"). Show a wa
 ### Runner view (`you.role === 'runner'`, `you.status === 'free'`)
 What it shows depends on `settings.runnerView`:
 - `'map'`: map with yourself, the zone and the jail. No chasers.
-- `'compass'`: an arrow pointing at the nearest chaser (section 6), with no distance.
 - `'none'`: just the timer and warnings.
 
 Always show:
@@ -196,7 +195,9 @@ If a value is out of range, you get `error` with code `bad_settings`, and the se
 | Jail size | `jail.radiusM` | slider | 5–100 m | 15 |
 | Seconds to jailbreak | `jail.holdSec` | slider | 1–60 | 5 |
 | Immunity after jailbreak | `jail.immunitySec` | slider | 0–120 s | 10 |
-| What runners see | `runnerView` | `map` / `compass` / `none` | | `map` |
+| What runners see | `runnerView` | `map` / `none` (runners are never told a chaser's direction) | | `map` |
+| Runners see chasers | `visibility.runnersSeeChasers` | switch (live chaser positions on the runner map; needs `map`) | | off |
+| Chasers see each other | `visibility.chasersSeeChasers` | switch | | on |
 | Sounds & announcements | `announcements` | switch | | on |
 | Anti-camping | `antiCamping.enabled` | switch | | off |
 | …if nobody's caught for | `antiCamping.afterMin` | slider | 1–60 min | 6 |
@@ -236,6 +237,7 @@ Events are one-off moments. Play a sound or voice line and show a toast. Only pl
 | `player_infected` | all | `playerId` | "Ava is infected!" |
 | `player_jailed` | all | `playerId` | "Ava is in jail" |
 | `jailbreak` | all | `byId, freedIds` | "JAILBREAK! Dev freed 3 runners" |
+| `signal_lost` | chasers, spectators, host | `playerId` | "Dev's phone went dark. Last spot revealed!" |
 | `game_over` | all | `winner, reason` | "Runners win!" |
 | `back_to_lobby` | all | | |
 
@@ -243,22 +245,13 @@ iPhones only play sounds after the user has tapped something, so have players ta
 
 ---
 
-## 6. Compass
+## 6. Phones that go dark
 
-`you.compassBearing` is the direction to the nearest chaser in degrees from **north**. To point an arrow on screen, subtract the direction the phone is facing:
-
-```js
-let deviceHeading = 0;
-// iPhone: must be called from a button tap
-async function enableCompass() {
-  if (typeof DeviceOrientationEvent?.requestPermission === 'function') {
-    if (await DeviceOrientationEvent.requestPermission() !== 'granted') return;
-  }
-  window.addEventListener('deviceorientationabsolute', (e) => { deviceHeading = 360 - e.alpha; }); // Android
-  window.addEventListener('deviceorientation', (e) => { if (e.webkitCompassHeading != null) deviceHeading = e.webkitCompassHeading; }); // iPhone
-}
-const arrowRotation = (state.you.compassBearing - deviceHeading + 360) % 360; // rotate your arrow by this many degrees
-```
+A website can't send location while the phone is locked or the browser is closed. To stop that being a way to hide:
+- If a free runner sends no location for **30 s**, chasers get the `signal_lost` event and see the runner's **last known spot** as an exact marker with `reason: 'signal_lost'` (shown as "📵 PHONE OFF"). It disappears as soon as their phone sends a location again.
+- Every player has `gpsLost: true` in `players` while their phone is dark.
+- When a runner comes back to the page after 25+ s away, the app tells them their last spot was revealed.
+- The lobby has a "Lock your phone into the game" guide: Guided Access (iPhone) and App pinning (Android) stop the phone from leaving the browser or locking.
 
 ---
 

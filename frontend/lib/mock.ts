@@ -23,13 +23,14 @@ export const SETTINGS: Settings = {
   jail: { location: null, radiusM: 15, holdSec: 5, immunitySec: 10 },
   runnerView: 'map',
   announcements: true,
+  visibility: { runnersSeeChasers: false, chasersSeeChasers: true },
   antiCamping: { enabled: false, afterMin: 6 },
   outOfZone: { graceSec: 15 },
   catching: { radiusM: 15, autoAcceptSec: 15 },
 };
 
 const pl = (id: string, name: string, avatar: string, color: string, role: PublicPlayer['role']): PublicPlayer =>
-  ({ id, name, avatar, color, role, status: 'free', isHost: false, connected: true, immuneSec: 0 });
+  ({ id, name, avatar, color, role, status: 'free', isHost: false, connected: true, immuneSec: 0, gpsLost: false });
 
 const ROSTER: PublicPlayer[] = [
   pl('ava', 'Ava', '🦉', '#ff5a2c', 'chaser'),
@@ -86,7 +87,7 @@ export function game(o: GameOpts = {}): GameState {
       location: live('me', POS.me),
       inZone: playing ? true : null, outOfZoneRevealInSec: null, revealedForLeavingZone: false,
       heartbeat: playing && me.role === 'runner' && settings.heartbeat.enabled ? 0 : null,
-      compassBearing: null, jailbreakProgressSec: null,
+      jailbreakProgressSec: null,
       ...o.you,
     },
     zone: {
@@ -154,7 +155,7 @@ export function ctx(o: Partial<Ctx> = {}): Ctx {
   return {
     conn: 'open', waking: false, state: null, profile: ME_PROFILE, setProfile: noop, send: noop,
     createGame: noop, joinGame: noop, leave: noop, error: null, clearError: noop, toasts: [], flash: null,
-    clearFlash: noop, geo: 'ok', accuracy: 6, ready: true, makeReady: async () => {}, heading: 0,
+    clearFlash: noop, geo: 'ok', accuracy: 6, ready: true, makeReady: async () => {},
     kicked: false, clearKicked: noop, pendingCode: null, notify: noop, ...o,
   };
 }

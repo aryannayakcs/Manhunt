@@ -57,12 +57,13 @@ test('head start, then fuzzy scheduled updates that contain the runner', () => {
   game.handle(host.id, { type: 'start_game' });
   const { chasers: [c], runners: [r] } = roles();
   at(c.id, 0); at(r.id, 100, 90);
-  advance(29);
+  const tick = (n: number) => { for (let i = 0; i < n; i++) { at(c.id, 0); at(r.id, 100, 90); advance(1); } };
+  tick(29);
   assert.equal(game.phase, 'headstart');
   assert.equal(game.stateFor(c.id).map.runners.length, 0, 'chasers see nothing during head start');
-  advance(1);
+  tick(1);
   assert.equal(game.phase, 'active');
-  advance(60);
+  tick(60);
   const m = game.stateFor(c.id).map.runners;
   assert.equal(m.length, 1);
   assert.equal(m[0].exact, false);
@@ -143,14 +144,15 @@ test('leaving the zone reveals the runner exactly after the grace period', () =>
   assert.equal(game.stateFor(c.id).map.runners.length, 0, 'reveal clears when back inside');
 });
 
-test('heartbeat and compass for runners', () => {
-  const { game, host, at, advance, roles } = setup(2, { headStart: { enabled: false, seconds: 10 }, runnerView: 'compass' });
+test('heartbeat warns runners without revealing direction', () => {
+  const { game, host, at, advance, roles } = setup(2, { headStart: { enabled: false, seconds: 10 } });
   game.handle(host.id, { type: 'start_game' });
   const { chasers: [c], runners: [r] } = roles();
   at(r.id, 0); at(c.id, 40, 90); advance(1);
   const you = game.stateFor(r.id).you;
   assert.equal(you.heartbeat, 2);
-  assert.ok(Math.abs(you.compassBearing! - 90) <= 1);
+  assert.ok(!('compassBearing' in you), 'no direction is sent to runners');
+  assert.throws(() => game.handle(host.id, { type: 'update_settings', settings: { runnerView: 'compass' } }));
 });
 
 test('time up with a free runner = runners win; pause stops the clock', () => {
@@ -192,4 +194,50 @@ test('walking distance is counted even with small 1-second steps', () => {
   game.handle(host.id, { type: 'end_game' });
   const d = game.stateFor(p.id).results!.players.find(x => x.playerId === p.id)!.distanceM;
   assert.ok(d >= 125 && d <= 145, `expected ~140 m, got ${d}`);
+});
+
+test('a runner whose phone goes dark is shown at their last spot until it comes back', () => {
+  const { game, host, at, advance, roles, events } = setup(2, { headStart: { enabled: false, seconds: 10 }, locationUpdates: { mode: 'off', intervalSec: 60 } });
+  game.handle(host.id, { type: 'start_game' });
+  const { chasers: [c], runners: [r] } = roles();
+  at(r.id, 100);
+  for (let i = 0; i < 25; i++) { at(c.id, 0); advance(1); }
+  assert.equal(game.stateFor(c.id).map.runners.length, 0, 'still fine before 30 s');
+  for (let i = 0; i < 10; i++) { at(c.id, 0); advance(1); }
+  const m = game.stateFor(c.id).map.runners;
+  assert.equal(m[0]?.reason, 'signal_lost');
+  assert.equal(m[0]?.exact, true);
+  assert.ok(events(c.id).includes('signal_lost'));
+  assert.equal(game.stateFor(c.id).players.find(p => p.id === r.id)?.gpsLost, true);
+  at(r.id, 120); advance(1);
+  assert.equal(game.stateFor(c.id).map.runners.length, 0, 'hidden again once the phone is back');
+  assert.equal(game.stateFor(c.id).players.find(p => p.id === r.id)?.gpsLost, false);
+});
+
+test('who can see chasers: runners (off by default) and chasers (on by default)', () => {
+  const { game, host, at, roles } = setup(4, { headStart: { enabled: false, seconds: 10 }, chasers: { count: 2, selection: 'random' } });
+  game.handle(host.id, { type: 'start_game' });
+  const { chasers: [c1, c2], runners: [r] } = roles();
+  at(c1.id, 0); at(c2.id, 50); at(r.id, 100);
+  assert.equal(game.stateFor(r.id).map.chasers.length, 0, 'runners see no chasers by default');
+  assert.equal(game.stateFor(c1.id).map.chasers.length, 2, 'chasers see each other by default');
+
+  // settings can only change in the lobby: end, change, start again
+  game.handle(host.id, { type: 'end_game' });
+  game.handle(host.id, { type: 'rematch' });
+  game.handle(host.id, { type: 'update_settings', settings: { chasers: { count: 2, selection: 'random' }, visibility: { runnersSeeChasers: true, chasersSeeChasers: false } } });
+  game.handle(host.id, { type: 'start_game' });
+  const { chasers: [d1, d2], runners: [r2] } = roles();
+  at(d1.id, 0); at(d2.id, 50); at(r2.id, 100);
+  assert.equal(game.stateFor(r2.id).map.chasers.length, 2, 'runners now see chasers');
+  assert.deepEqual(game.stateFor(d1.id).map.chasers.map(x => x.playerId), [d1.id], 'chasers only see themselves');
+
+  // runners with the "nothing" view never get chaser positions
+  game.handle(host.id, { type: 'end_game' });
+  game.handle(host.id, { type: 'rematch' });
+  game.handle(host.id, { type: 'update_settings', settings: { runnerView: 'none' } });
+  game.handle(host.id, { type: 'start_game' });
+  const { runners: [r3], chasers: [e1] } = roles();
+  at(e1.id, 0); at(r3.id, 100);
+  assert.equal(game.stateFor(r3.id).map.chasers.length, 0);
 });

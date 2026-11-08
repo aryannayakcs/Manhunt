@@ -7,7 +7,11 @@
 - Fuzzy updates, final countdown, heartbeat warning, anti-camping (all toggleable)
 - Circular play zone, optional shrinking zone, out-of-zone warning and reveal
 - When caught: out / infection / jail with jailbreak and immunity
-- Runner view: map / compass / nothing
+- Runner view: map / nothing (runners only get a pulsing "how close" warning, never a direction)
+- Who can see chasers: runners (optional) and other chasers (optional)
+- Phones that go dark for 30 s reveal the runner's last spot ("PHONE OFF"); lock-the-app guide in the lobby
+- Zone can be placed anywhere: place search, tap to move, drag the edge to resize (up to 20 km)
+- /gallery page showing every screen with sample data
 - Catch with distance check, confirm/dispute, auto-confirm
 - Host controls: pause, resume, end, kick, transfer host, rematch
 - Event stream for sounds and announcements

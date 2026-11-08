@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { bearingDeg, distanceM, fuzzCenter } from './geo.ts';
+import { distanceM, fuzzCenter } from './geo.ts';
 import type {
   ClientMessage, EventName, GameState, LiveMarker, Phase, Results, Role, RunnerMarker, ServerMessage, Status,
 } from './protocol.ts';
@@ -7,6 +7,8 @@ import { applySettingsPatch, DEFAULT_SETTINGS, type LatLng, type Settings } from
 
 export const MAX_PLAYERS = 50;
 const FRESH_MS = 30_000; // a location older than this is "stale"
+/** A runner whose phone sends nothing for this long (locked, Safari closed, no signal) gets revealed. */
+const SIGNAL_LOST_MS = 30_000;
 const ROUTE_SAMPLE_MS = 5_000;
 
 interface Loc { lat: number; lng: number; accuracy: number; at: number }
@@ -33,6 +35,7 @@ interface Player {
   inZone: boolean | null;
   outOfZoneSince: number | null; // game ms
   revealedOut: boolean;
+  signalLost: boolean;
   immuneUntil: number; // game ms
   jailHoldSince: number | null; // game ms
 }
@@ -362,6 +365,7 @@ export class Game {
     }
 
     this.checkZones(e);
+    if (this.phase === 'active') this.checkSignal();
 
     if (this.phase === 'active') {
       this.announcements(e);
@@ -425,14 +429,31 @@ export class Game {
     }
   }
 
+  /** Locking the phone or closing Safari stops location updates. That must not be a way to hide. */
+  private checkSignal() {
+    const now = this.now();
+    for (const p of this.players.values()) {
+      if (p.role !== 'runner' || p.status !== 'free' || !p.loc || p.signalLost) continue;
+      if (now - p.loc.at > SIGNAL_LOST_MS) {
+        p.signalLost = true;
+        this.log('signal_lost', p.id);
+        this.emit('signal_lost', { playerId: p.id }, this.ids(q => q.role === 'chaser' || q.status === 'out' || q.id === this.hostId));
+      }
+    }
+  }
+
   private doReveals(e: number) {
     const runners = [...this.players.values()].filter(p => p.role === 'runner' && p.status === 'free' && p.loc);
     // Penalty: runners outside the zone are shown exactly, continuously.
-    for (const p of runners) if (p.revealedOut) this.reveal(p, true, 'out_of_zone', e);
+    for (const p of runners) {
+      if (p.revealedOut) this.reveal(p, true, 'out_of_zone', e);
+      else if (p.signalLost) this.reveal(p, true, 'signal_lost', e); // last known spot
+    }
+    const hidden = (p: Player) => p.revealedOut || p.signalLost;
 
     const mode = this.settings.locationUpdates.mode;
     if (mode === 'live') {
-      for (const p of runners) if (!p.revealedOut) this.reveal(p, true, 'live', e);
+      for (const p of runners) if (!hidden(p)) this.reveal(p, true, 'live', e);
       return;
     }
     if (mode !== 'interval' || this.nextRevealAt === null || e < this.nextRevealAt) return;
@@ -444,7 +465,7 @@ export class Game {
       this.emit('anti_camping');
     }
     const exact = camping || !this.settings.fuzzy.enabled;
-    for (const p of runners) if (!p.revealedOut) this.reveal(p, exact, camping ? 'anti_camping' : 'scheduled', e);
+    for (const p of runners) if (!hidden(p)) this.reveal(p, exact, camping ? 'anti_camping' : 'scheduled', e);
     this.nextRevealAt = e + this.revealIntervalMs();
     this.emit('locations_updated', { exact }, this.ids(q => q.role === 'chaser' || q.status === 'out'));
     this.emit('you_were_revealed', { exact }, runners.map(p => p.id));
@@ -504,6 +525,10 @@ export class Game {
       }
     }
     p.loc = { lat: m.lat, lng: m.lng, accuracy: m.accuracy, at: now };
+    if (p.signalLost) {
+      p.signalLost = false;
+      if (!p.revealedOut) this.reveals.delete(p.id); // back online: hide them again
+    }
     if (this.inPlay() && now - p.lastRouteAt >= ROUTE_SAMPLE_MS) {
       p.lastRouteAt = now;
       p.route.push([round6(m.lat), round6(m.lng), Math.round(this.elapsed() / 1000)]);
@@ -555,6 +580,7 @@ export class Game {
     runner.caughtAtChaseMs ??= this.chaseElapsed();
     runner.jailHoldSince = null;
     runner.revealedOut = false;
+    runner.signalLost = false;
     this.reveals.delete(runner.id);
     this.lastCatchAt = e;
     this.flags.antiCamping = false;
@@ -600,13 +626,13 @@ export class Game {
     const live = (p: Player): LiveMarker | null =>
       p.loc ? { playerId: p.id, lat: p.loc.lat, lng: p.loc.lng, accuracy: Math.round(p.loc.accuracy) } : null;
 
-    // Nearest chaser (for heartbeat / compass)
-    let nearest: { d: number; bearing: number } | null = null;
+    // Nearest chaser, for the heartbeat warning. Only the distance level is sent, never a direction.
+    let nearest: { d: number } | null = null;
     if (runnerFree && ph === 'active' && this.isFresh(me.loc)) {
       for (const c of this.players.values()) {
         if (c.role !== 'chaser' || !this.isFresh(c.loc)) continue;
         const d = distanceM(me.loc, c.loc);
-        if (!nearest || d < nearest.d) nearest = { d, bearing: bearingDeg(me.loc, c.loc) };
+        if (!nearest || d < nearest.d) nearest = { d };
       }
     }
     let heartbeat: number | null = null;
@@ -638,6 +664,7 @@ export class Game {
         id: p.id, name: p.name, color: p.color, avatar: p.avatar, role: p.role, status: p.status,
         isHost: p.id === this.hostId, connected: p.connected,
         immuneSec: playing ? Math.max(0, Math.ceil((p.immuneUntil - e) / 1000)) : 0,
+        gpsLost: playing && (!p.loc || this.now() - p.loc.at > SIGNAL_LOST_MS),
       })),
       you: {
         id: me.id, role: me.role, status: me.status, isHost: me.id === this.hostId,
@@ -647,7 +674,6 @@ export class Game {
           ? Math.max(0, Math.ceil((me.outOfZoneSince + this.settings.outOfZone.graceSec * 1000 - e) / 1000)) : null,
         revealedForLeavingZone: runnerFree && me.revealedOut,
         heartbeat,
-        compassBearing: runnerFree && this.settings.runnerView === 'compass' && nearest ? Math.round(nearest.bearing) : null,
         jailbreakProgressSec: me.jailHoldSince !== null ? Math.floor((e - me.jailHoldSince) / 1000) : null,
       },
       zone: {
@@ -665,7 +691,11 @@ export class Game {
       },
       map: {
         runners,
-        chasers: chaserView || spectator ? all.filter(p => p.role === 'chaser').map(live).filter(x => x !== null) : [],
+        chasers: all.filter(p => p.role === 'chaser' && (
+          spectator
+          || (chaserView && (p.id === me.id || this.settings.visibility.chasersSeeChasers))
+          || (playing && me.role === 'runner' && me.status !== 'out' && this.settings.runnerView === 'map' && this.settings.visibility.runnersSeeChasers)
+        )).map(live).filter(x => x !== null),
         everyone: spectator ? all.map(live).filter(x => x !== null) : [],
       },
       pendingCatch: pc ? {
@@ -715,7 +745,7 @@ function freshStats() {
   return {
     route: [] as Array<[number, number, number]>, lastRouteAt: 0, distanceM: 0, distAnchor: null, catches: 0,
     closestCallM: null, caughtAtChaseMs: null, inZone: null, outOfZoneSince: null,
-    revealedOut: false, immuneUntil: 0, jailHoldSince: null,
+    revealedOut: false, signalLost: false, immuneUntil: 0, jailHoldSince: null,
   };
 }
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;

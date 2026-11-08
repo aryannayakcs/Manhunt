@@ -22,6 +22,11 @@ export interface MapProps {
   /** Map taps / drag report here (zone editing). */
   onPick?: (p: LatLng) => void;
   draggable?: LatLng | null;
+  /** A second handle on the zone's edge; dragging it reports where it is (zone editing). */
+  radiusHandle?: LatLng | null;
+  onRadiusDrag?: (p: LatLng) => void;
+  /** Fly the camera here whenever `key` changes (e.g. after a place search). */
+  focus?: { p: LatLng; key: number } | null;
 }
 
 // Free dark vector map, no API key or usage limits (openfreemap.org).
@@ -44,6 +49,9 @@ export default function MapView(p: MapProps) {
   const mks = useRef(new Map<string, Marker>());
   const fitted = useRef(false);
   const drag = useRef<Marker | null>(null);
+  const rh = useRef<Marker | null>(null);
+  const rhDragging = useRef(false);
+  const focusKey = useRef<number | null>(null);
   const props = useRef(p);
   props.current = p;
 
@@ -76,7 +84,7 @@ export default function MapView(p: MapProps) {
       sync();
     });
     m.on('click', (e) => props.current.onPick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
-    return () => { m.remove(); map.current = null; loaded.current = false; mks.current.clear(); drag.current = null; fitted.current = false; };
+    return () => { m.remove(); map.current = null; loaded.current = false; mks.current.clear(); drag.current = null; rh.current = null; fitted.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -119,6 +127,25 @@ export default function MapView(p: MapProps) {
         drag.current.on('dragend', () => { const l = drag.current!.getLngLat(); props.current.onPick?.({ lat: l.lat, lng: l.lng }); });
       } else drag.current.setLngLat([pr.draggable.lng, pr.draggable.lat]);
     } else if (drag.current) { drag.current.remove(); drag.current = null; }
+
+    // edge handle for resizing the zone
+    if (pr.radiusHandle) {
+      if (!rh.current) {
+        const el = document.createElement('div'); el.className = 'mk';
+        el.innerHTML = '<i class="rh" title="Drag to resize"></i>';
+        el.style.pointerEvents = 'auto';
+        rh.current = new maplibregl.Marker({ element: el, draggable: true }).setLngLat([pr.radiusHandle.lng, pr.radiusHandle.lat]).addTo(m);
+        rh.current.on('dragstart', () => { rhDragging.current = true; });
+        rh.current.on('drag', () => { const l = rh.current!.getLngLat(); props.current.onRadiusDrag?.({ lat: l.lat, lng: l.lng }); });
+        rh.current.on('dragend', () => { rhDragging.current = false; });
+      } else if (!rhDragging.current) rh.current.setLngLat([pr.radiusHandle.lng, pr.radiusHandle.lat]);
+    } else if (rh.current) { rh.current.remove(); rh.current = null; }
+
+    if (pr.focus && pr.focus.key !== focusKey.current) {
+      focusKey.current = pr.focus.key;
+      fitted.current = true;
+      m.flyTo({ center: [pr.focus.p.lng, pr.focus.p.lat], zoom: Math.max(m.getZoom(), 15), duration: 900 });
+    }
 
     // camera
     if (pr.fit && zc && !fitted.current) {

@@ -4,6 +4,7 @@ import { Game, GameError } from './game.ts';
 import { ClientMessageSchema, type ServerMessage } from './protocol.ts';
 
 const PORT = Number(process.env.PORT ?? 8080);
+const VERSION = '2026-11-07c'; // bump when deploying, so /health shows which code is live
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O
 const EMPTY_GAME_TTL_MS = 30 * 60_000; // delete games with nobody connected after 30 min
 const LOCATION_MIN_GAP_MS = 500;
@@ -28,7 +29,8 @@ function newCode(): string {
 const http = createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
-    res.end(JSON.stringify({ ok: true, games: games.size }));
+    let players = 0; for (const g of games.values()) players += g.connectedCount;
+    res.end(JSON.stringify({ ok: true, version: VERSION, games: games.size, players }));
     return;
   }
   res.writeHead(200, { 'content-type': 'text/plain' });

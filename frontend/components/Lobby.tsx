@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useGame } from '@/lib/game';
 import type { GameState, LatLng } from '@/lib/protocol';
-import { fmtTime } from '@/lib/util';
+import { distM, fmtTime } from '@/lib/util';
 import Map from './Map';
 import { Avatar, Code, Row, Seg, Slider, Stepper, Switch, Tag } from './ui';
 
@@ -14,6 +14,7 @@ export function Lobby({ s, onEditProfile, initialView = 'main' }: { s: GameState
   const [view, setView] = useState<View>(initialView);
   const [qr, setQr] = useState<string | null>(null);
   const [showQr, setShowQr] = useState(false);
+  const [tips, setTips] = useState(false);
   const host = s.you.isHost;
   const link = typeof location !== 'undefined' ? `${location.origin}/join/${s.code}` : '';
   const manual = s.settings.chasers.selection === 'host';
@@ -48,6 +49,8 @@ export function Lobby({ s, onEditProfile, initialView = 'main' }: { s: GameState
           <div className="hint">✅ Ready · keep this screen open and turn brightness down</div>
         </>
       )}
+      <button className="btn sm ghost" style={{ minHeight: 48, fontSize: 15 }} onClick={() => setTips(true)}>🔒 Lock your phone into the game</button>
+      {tips && <LockTips onClose={() => setTips(false)} />}
 
       {s.zone.center ? <div style={{ height: 150, display: 'flex', flex: 'none' }}><Map zone={s.zone} finalRadiusM={s.zone.finalRadiusM} jail={s.jail} fit follow={null} markers={me(s)} /></div>
         : <div className="card center mut">{host ? 'No play zone yet' : 'Host is setting up the play zone…'}</div>}
@@ -55,7 +58,7 @@ export function Lobby({ s, onEditProfile, initialView = 'main' }: { s: GameState
       <div className="row mut wrap" style={{ fontSize: 13, justifyContent: 'space-between' }}>
         <span>⏱ {st.durationMin} min</span>
         <span>🏃 {st.headStart.enabled ? fmtTime(st.headStart.seconds) : 'No head start'}</span>
-        <span>🎯 {st.runnerView === 'map' ? 'Map' : st.runnerView === 'compass' ? 'Compass' : 'Blind'}</span>
+        <span>🎯 {st.runnerView === 'map' ? 'Map' : 'Blind'}</span>
         <span>⛓ {st.caughtMode === 'jail' ? 'Jail' : st.caughtMode === 'infection' ? 'Infection' : 'Out'}</span>
       </div>
 
@@ -116,11 +119,40 @@ function PlayerMenu({ id, name }: { id: string; name: string }) {
   );
 }
 
+/** How to stop the phone from leaving the game: Guided Access (iPhone) / App pinning (Android). */
+export function LockTips({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="sheet" style={{ zIndex: 60, justifyContent: 'flex-start', overflowY: 'auto' }}>
+      <div className="disp" style={{ fontSize: 34 }}>Keep your phone in the game</div>
+      <p className="mut" style={{ fontSize: 14 }}>A website can&apos;t share your location while your phone is locked or Safari is closed. If a runner&apos;s phone goes dark for 30 seconds, chasers see their last spot. Lock the game on screen so it can&apos;t happen by accident:</p>
+      <div className="card tips">
+        <b>iPhone: Guided Access</b>
+        <ol>
+          <li>Settings → Accessibility → <b>Guided Access</b> → turn it on.</li>
+          <li>On that screen, set <b>Display Auto-Lock</b> to <b>Never</b>.</li>
+          <li>Back here, <b>triple-click the side button</b>, tap <b>Options</b>, turn off <b>Side Button</b>, then tap <b>Start</b>. The first time, it asks you to set a passcode.</li>
+          <li>After the game: triple-click the side button again to exit.</li>
+        </ol>
+      </div>
+      <div className="card tips">
+        <b>Android: App pinning</b>
+        <ol>
+          <li>Settings → search <b>&ldquo;pin&rdquo;</b> → turn on <b>App pinning</b> (the name varies by phone).</li>
+          <li>Open recent apps, tap the Chrome icon above this game, tap <b>Pin</b>.</li>
+          <li>After the game: hold Back + Overview, or swipe up and hold, to unpin.</li>
+        </ol>
+      </div>
+      <p className="hint">Also turn brightness down, and bring a battery pack for long games.</p>
+      <button className="btn runner" onClick={onClose}>Got it</button>
+    </div>
+  );
+}
+
 function ReadyCard({ onReady }: { onReady: () => Promise<void> }) {
   return (
     <div className="card" style={{ flex: 'none' }}>
       <div className="disp" style={{ fontSize: 28, marginBottom: 6 }}>Get ready</div>
-      <p className="mut" style={{ fontSize: 13, marginBottom: 10 }}>One tap turns on location (so the game can referee), sound, keep-awake and compass.</p>
+      <p className="mut" style={{ fontSize: 13, marginBottom: 10 }}>One tap turns on location (so the game can referee), sound and keep-screen-on.</p>
       <button className="btn runner" style={{ minHeight: 72, fontSize: 28 }} onClick={() => void onReady()}>I&apos;m ready</button>
     </div>
   );
@@ -182,8 +214,18 @@ function Settings({ s, back, openZone }: { s: GameState; back: () => void; openZ
         </div>
 
         <div className="lbl">Runners see</div>
-        <Seg value={st.runnerView} opts={[['map', 'Map'], ['compass', 'Compass'], ['none', 'Nothing']]} set={(v) => up({ runnerView: v })} />
+        <Seg value={st.runnerView} opts={[['map', 'Their map'], ['none', 'Nothing']]} set={(v) => up({ runnerView: v })} />
         <div className="card"><Row label="Heartbeat warning"><Switch on={st.heartbeat.enabled} set={(v) => up({ heartbeat: { enabled: v } })} /></Row></div>
+
+        <div className="lbl">Who can see chasers</div>
+        <div className="card">
+          <Row label={<span>Runners see chasers<br /><small className="mut">Live, on the runner&apos;s map{st.runnerView === 'none' ? ' (needs “Their map”)' : ''}</small></span>}>
+            <Switch on={st.visibility.runnersSeeChasers} set={(v) => up({ visibility: { runnersSeeChasers: v }, ...(v && st.runnerView === 'none' ? { runnerView: 'map' } : {}) })} />
+          </Row>
+          <Row label={<span>Chasers see each other<br /><small className="mut">Teammates on the chaser map</small></span>}>
+            <Switch on={st.visibility.chasersSeeChasers} set={(v) => up({ visibility: { chasersSeeChasers: v } })} />
+          </Row>
+        </div>
 
         <div className="lbl">Play zone</div>
         <div className="card">
@@ -232,6 +274,9 @@ function Settings({ s, back, openZone }: { s: GameState; back: () => void; openZ
 }
 
 /* ---------------- Zone editor ---------------- */
+interface Place { name: string; detail: string; lat: number; lng: number }
+const eastOf = (c: LatLng, m: number): LatLng => ({ lat: c.lat, lng: c.lng + m / (111320 * Math.cos((c.lat * Math.PI) / 180)) });
+
 function ZoneEditor({ s, back }: { s: GameState; back: () => void }) {
   const { send, error, clearError } = useGame();
   const st = s.settings;
@@ -239,32 +284,70 @@ function ZoneEditor({ s, back }: { s: GameState; back: () => void }) {
   const [radius, setRadius] = useState(st.zone.radiusM);
   const [center, setCenter] = useState<LatLng | null>(st.zone.center);
   const [jail, setJail] = useState<LatLng | null>(st.jail.location);
+  const [focus, setFocus] = useState<{ p: LatLng; key: number } | null>(null);
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<Place[] | null>(null);
+  const [searching, setSearching] = useState(false);
   const host = s.you.isHost;
   const jailOn = st.caughtMode === 'jail';
 
-  const gps = () => navigator.geolocation?.getCurrentPosition((p) => { const c = { lat: p.coords.latitude, lng: p.coords.longitude }; setCenter(c); }, () => {}, { enableHighAccuracy: true, timeout: 8000 });
+  const moveTo = (c: LatLng) => { setCenter(c); setFocus({ p: c, key: Date.now() }); };
+  const gps = () => navigator.geolocation?.getCurrentPosition((p) => moveTo({ lat: p.coords.latitude, lng: p.coords.longitude }), () => {}, { enableHighAccuracy: true, timeout: 8000 });
+  // First time only: start the zone where you are. You can move it anywhere after.
   useEffect(() => { if (!center && s.you.location) setCenter({ lat: s.you.location.lat, lng: s.you.location.lng }); }, [center, s.you.location]);
   useEffect(() => { if (!st.zone.center && host) gps(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pick = (p: LatLng) => { if (!host) return; if (mode === 'zone') setCenter(p); else setJail(p); };
+  // Place search (OpenStreetMap). Runs only when you press Search, never while typing.
+  const search = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!q.trim()) return;
+    setSearching(true);
+    try {
+      const near = center ? `&viewbox=${center.lng - 1},${center.lat + 1},${center.lng + 1},${center.lat - 1}` : '';
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6${near}&q=${encodeURIComponent(q.trim())}`);
+      const j = (await r.json()) as Array<{ display_name: string; lat: string; lon: string }>;
+      setResults(j.map((x) => { const [name, ...rest] = x.display_name.split(', '); return { name, detail: rest.slice(0, 3).join(', '), lat: Number(x.lat), lng: Number(x.lon) }; }));
+    } catch { setResults([]); } finally { setSearching(false); }
+  };
+
+  const pick = (p: LatLng) => { if (!host) return; setResults(null); if (mode === 'zone') setCenter(p); else setJail(p); };
+  const resize = (p: LatLng) => { if (center) setRadius(Math.min(20000, Math.max(20, Math.round(distM(center, p) / 5) * 5))); };
   const save = () => {
     if (host && center) send({ type: 'update_settings', settings: { zone: { center, radiusM: radius }, ...(jailOn && jail ? { jail: { location: jail } } : {}) } });
     back();
   };
+  const you = s.you.location;
+  const youInside = !!(you && center && distM(you, center) <= radius);
 
   return (
     <div className="scr">
-      <div className="top"><span className="disp" style={{ fontSize: 30 }}>Play zone</span><span className="pill">{radius} m</span></div>
+      <div className="top"><span className="disp" style={{ fontSize: 30 }}>Play zone</span><span className="pill">{radius >= 1000 ? `${(radius / 1000).toFixed(2)} km` : `${radius} m`}</span></div>
       {!host && <div className="banner info">Only the host can edit the zone</div>}
+      {host && (
+        <form className="search" onSubmit={search}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a park, school, street…" aria-label="Search for a place" enterKeyHint="search" />
+          <button className="btn sm" style={{ width: 'auto', padding: '0 16px', minHeight: 50 }} disabled={searching}>{searching ? '…' : 'Search'}</button>
+          {results && (
+            <div className="results">
+              {results.length === 0 ? <span className="mut" style={{ padding: 10 }}>No places found</span> : results.map((r, i) => (
+                <button type="button" key={i} onClick={() => { moveTo({ lat: r.lat, lng: r.lng }); setResults(null); setQ(r.name); }}>{r.name}<small>{r.detail}</small></button>
+              ))}
+            </div>
+          )}
+        </form>
+      )}
       <Map zone={center ? { center, radiusM: radius } : null} finalRadiusM={st.shrinkingZone.enabled ? Math.min(st.shrinkingZone.finalRadiusM, radius) : null}
         jail={jailOn ? { location: jail ?? center ?? { lat: 0, lng: 0 }, radiusM: st.jail.radiusM } : null}
-        fit={!!center} draggable={mode === 'zone' ? center : jail} onPick={pick} markers={me(s)} />
-      <div className="mut hint">{mode === 'zone' ? 'Tap the map or drag the handle to place the zone' : 'Tap the map to drop the jail pin'}</div>
-      <Slider label="Radius" value={radius} min={20} max={2000} step={10} fmt={(v) => `${v} m`} set={setRadius} disabled={!host} />
+        fit={!!center} focus={focus} draggable={mode === 'zone' ? center : jail} onPick={pick}
+        radiusHandle={host && mode === 'zone' && center ? eastOf(center, radius) : null} onRadiusDrag={resize} markers={me(s)} />
+      <div className="mut hint">{mode === 'zone'
+        ? <>Tap <b>anywhere</b> to move the zone. It doesn&apos;t have to be around you. Drag the ring on the edge to resize.{you && center && !youInside && <><br />You&apos;re currently outside the zone. That&apos;s fine if you&apos;re walking there.</>}</>
+        : 'Tap the map to drop the jail pin.'}</div>
+      <Slider label="Size" value={Math.min(radius, Math.max(3000, radius))} min={20} max={Math.max(3000, radius)} step={10} fmt={(v) => (v >= 1000 ? `${(v / 1000).toFixed(2)} km` : `${v} m`)} set={setRadius} disabled={!host} />
       {error && <div className="banner danger" onClick={clearError}>{error}</div>}
       <div className="row">
-        <button className="btn sm" onClick={gps}>📍 My location</button>
-        {jailOn && <button className="btn sm" onClick={() => setMode(mode === 'zone' ? 'jail' : 'zone')}>{mode === 'zone' ? '⛓ Jail pin' : '◎ Zone'}</button>}
+        <button className="btn sm" onClick={gps}>📍 Center on me</button>
+        {jailOn && <button className="btn sm" onClick={() => setMode(mode === 'zone' ? 'jail' : 'zone')}>{mode === 'zone' ? '⛓ Place jail' : '◎ Edit zone'}</button>}
       </div>
       <button className="btn runner" disabled={!center && host} onClick={save}>{host ? 'Save zone' : 'Back'}</button>
     </div>
