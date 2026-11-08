@@ -210,8 +210,8 @@ function Settings({ s, back, openZone }: { s: GameState; back: () => void; openZ
               <Slider label="Updates every" value={st.finalCountdown.intervalSec} min={5} max={600} step={5} fmt={sec} set={(v) => up({ finalCountdown: { intervalSec: v } })} />
             </>
           )}
-          <Row label="Anti-camping"><Switch on={st.antiCamping.enabled} set={(v) => up({ antiCamping: { enabled: v } })} /></Row>
-          {st.antiCamping.enabled && <Slider label="If nobody caught for" value={st.antiCamping.afterMin} min={1} max={60} fmt={min} set={(v) => up({ antiCamping: { afterMin: v } })} />}
+          {st.locationUpdates.mode === 'interval' && <Row label={<span>Anti-camping<br /><small className="mut">If nobody&apos;s caught for a while, the next update is exact</small></span>}><Switch on={st.antiCamping.enabled} set={(v) => up({ antiCamping: { enabled: v } })} /></Row>}
+          {st.locationUpdates.mode === 'interval' && st.antiCamping.enabled && <Slider label="If nobody caught for" value={st.antiCamping.afterMin} min={1} max={60} fmt={min} set={(v) => up({ antiCamping: { afterMin: v } })} />}
         </div>
 
         <div className="lbl">Runners see</div>

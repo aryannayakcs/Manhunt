@@ -100,6 +100,7 @@ const SECTIONS: Section[] = [
       { title: 'Reconnecting / weak GPS', desc: 'Signal dropped (rejoins automatically) and GPS is inaccurate.', c: { conn: 'closed', geo: 'weak', accuracy: 42 }, s: game({ ...runner }), render: inGame },
       { title: 'Sound off after a reload', desc: 'Phones block sound and keep-awake after a page reload until you tap.', c: { ready: false }, s: game({ ...runner }), render: inGame },
       { title: 'Location blocked', desc: 'The player denied location permission.', c: { geo: 'denied' }, s: game({ ...runner }), render: inGame },
+      { title: 'Opened in another tab', desc: 'The same player opened the game in a second tab or window. The old one steps aside instead of fighting for the connection.', c: { replaced: true, conn: 'closed' }, s: game({ ...runner }), render: inGame },
       { title: 'Kicked', desc: 'The host removed you.', render: () => <Kicked onClose={() => {}} /> },
     ],
   },

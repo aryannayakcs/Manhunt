@@ -12,6 +12,7 @@ const SIGNAL_LOST_MS = 30_000;
 /** Auto-catch only trusts GPS fixes this fresh and this accurate (on both phones). */
 const AUTO_FRESH_MS = 4_000;
 const AUTO_MAX_ACCURACY_M = 15;
+const DISPUTE_COOLDOWN_MS = 10_000;
 const ROUTE_SAMPLE_MS = 5_000;
 
 interface Loc { lat: number; lng: number; accuracy: number; at: number }
@@ -43,6 +44,8 @@ interface Player {
   jailHoldSince: number | null; // game ms
   /** Auto-catch: which chaser has been close to this runner, and since when (game ms). */
   autoNear: { chaserId: string; since: number } | null;
+  /** False for people who joined mid-game to spectate: they get no stats or awards for this round. */
+  played: boolean;
 }
 
 interface Reveal { lat: number; lng: number; radiusM: number; exact: boolean; reason: RunnerMarker['reason']; at: number }
@@ -85,6 +88,10 @@ export class Game {
   /** Snapshots of chaser positions shown to runners (when runners see chasers on a timer). */
   private chaserReveals = new Map<string, { lat: number; lng: number; accuracy: number; at: number }>();
   private nextChaserRevealAt: number | null = null;
+  /** No "phone went dark" penalties before this game time (after the chase starts or a pause ends). */
+  private signalGraceUntil = 0;
+  /** After a runner disputes, that chaser can't re-request them until this game time. key: chaserId:runnerId */
+  private disputeCooldown = new Map<string, number>();
   private lastCatchAt = 0;
   private reveals = new Map<string, Reveal>();
   private pending = new Map<string, Pending>();
@@ -113,6 +120,7 @@ export class Game {
       status: midGame ? 'out' : 'free',
       connected: true, loc: null,
       ...freshStats(),
+      played: !midGame,
     };
     this.players.set(p.id, p);
     if (!this.hostId) this.hostId = p.id;
@@ -301,7 +309,9 @@ export class Game {
       p.startRole = p.role;
       p.status = 'free';
       Object.assign(p, freshStats());
+      p.played = true;
     }
+    this.disputeCooldown.clear();
     this.reveals.clear();
     this.pending.clear();
     this.timeline = [];
@@ -330,6 +340,7 @@ export class Game {
     const v = this.settings.visibility;
     this.chaserReveals.clear();
     this.nextChaserRevealAt = v.runnersSeeChasers && v.chaserUpdates === 'interval' ? e + v.chaserIntervalSec * 1000 : null;
+    this.signalGraceUntil = e + SIGNAL_LOST_MS;
   }
 
   private pause() {
@@ -347,6 +358,8 @@ export class Game {
     this.pausedAt = null;
     this.phase = this.pausedFrom!;
     this.pausedFrom = null;
+    // Phones may have been locked during the pause: give everyone time to come back before penalties.
+    this.signalGraceUntil = Math.max(this.signalGraceUntil, this.elapsed() + SIGNAL_LOST_MS);
     this.emit('resumed');
     this.broadcastState();
   }
@@ -459,7 +472,7 @@ export class Game {
       }
       p.inZone = inside;
       if (!inside && p.role === 'runner' && this.phase === 'active' && !p.revealedOut
-        && e - (p.outOfZoneSince ?? e) >= this.settings.outOfZone.graceSec * 1000) {
+        && e - Math.max(p.outOfZoneSince ?? e, this.headStartMs) >= this.settings.outOfZone.graceSec * 1000) {
         p.revealedOut = true;
         this.emit('revealed_for_leaving_zone', { playerId: p.id }, [p.id, ...this.ids(q => q.role === 'chaser')]);
       }
@@ -468,6 +481,7 @@ export class Game {
 
   /** Locking the phone or closing Safari stops location updates. That must not be a way to hide. */
   private checkSignal() {
+    if (this.elapsed() < this.signalGraceUntil) return;
     const now = this.now();
     for (const p of this.players.values()) {
       if (p.role !== 'runner' || p.status !== 'free' || !p.loc || p.signalLost) continue;
@@ -592,8 +606,13 @@ export class Game {
     const e = this.elapsed();
     if (runner.immuneUntil > e) throw new GameError('immune', 'They were just freed from jail and are immune for a few seconds.');
     if ([...this.pending.values()].some(pc => pc.runnerId === runnerId)) throw new GameError('already_pending', 'That catch is already waiting for confirmation.');
+    const cooldown = this.disputeCooldown.get(`${chaser.id}:${runnerId}`) ?? 0;
+    if (cooldown > e) throw new GameError('cooldown', `They just disputed. Try again in ${Math.ceil((cooldown - e) / 1000)} s.`);
+    if (!this.isFresh(chaser.loc)) throw new GameError('no_location', "Your location isn't updating, so the game can't check the catch. Turn location on and keep the app open.");
 
-    if (this.isFresh(chaser.loc) && this.isFresh(runner.loc)) {
+    // If the runner's phone has gone dark we can't check distance; they'll get the confirm prompt when it's back
+    // (or it counts automatically), and chasers already see their last spot.
+    if (this.isFresh(runner.loc)) {
       const d = distanceM(chaser.loc, runner.loc);
       const allowed = this.settings.catching.radiusM + Math.min(chaser.loc.accuracy + runner.loc.accuracy, 30);
       if (d > allowed) {
@@ -613,6 +632,7 @@ export class Game {
     if (accept) this.applyCatch(pc);
     else {
       this.pending.delete(pc.id);
+      this.disputeCooldown.set(`${pc.chaserId}:${pc.runnerId}`, this.elapsed() + DISPUTE_COOLDOWN_MS);
       this.emit('catch_disputed', { catchId, chaserId: pc.chaserId, runnerId: pc.runnerId }, [pc.chaserId, pc.runnerId, this.hostId]);
       this.broadcastState();
     }
@@ -749,7 +769,7 @@ export class Game {
         location: live(me),
         inZone: playing ? me.inZone : null,
         outOfZoneRevealInSec: runnerFree && me.inZone === false && !me.revealedOut && me.outOfZoneSince !== null
-          ? Math.max(0, Math.ceil((me.outOfZoneSince + this.settings.outOfZone.graceSec * 1000 - e) / 1000)) : null,
+          ? Math.max(0, Math.ceil((Math.max(me.outOfZoneSince, this.headStartMs) + this.settings.outOfZone.graceSec * 1000 - e) / 1000)) : null,
         revealedForLeavingZone: runnerFree && me.revealedOut,
         heartbeat,
         jailbreakProgressSec: me.jailHoldSince !== null ? Math.floor((e - me.jailHoldSince) / 1000) : null,
@@ -795,7 +815,7 @@ export class Game {
 
   private buildResults(winner: Results['winner'], reason: Results['reason']): Results {
     const chaseMs = this.chaseElapsed();
-    const players = [...this.players.values()].map(p => ({
+    const players = [...this.players.values()].filter(p => p.played).map(p => ({
       playerId: p.id, name: p.name, color: p.color,
       startRole: p.startRole, endRole: p.role, endStatus: p.status,
       survivedSec: p.startRole === 'runner' ? Math.round((p.caughtAtChaseMs ?? chaseMs) / 1000) : null,

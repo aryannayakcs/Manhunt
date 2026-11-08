@@ -33,6 +33,8 @@ export interface Ctx {
   clearKicked: () => void;
   pendingCode: string | null;
   notify: (text: string, kind?: Toast['kind']) => void;
+  /** This tab was replaced by the same player opening the game somewhere else. */
+  replaced: boolean;
 }
 
 export const GameCtx = createContext<Ctx>(null as unknown as Ctx);
@@ -65,6 +67,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [kicked, setKicked] = useState(false);
+  const [replaced, setReplaced] = useState(false);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
 
   const ws = useRef<WebSocket | null>(null);
@@ -179,8 +182,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
           case 'kicked': sessionRef.current = null; lsDel('session'); stateRef.current = null; setState(null); setKicked(true); break;
         }
       };
-      sock.onclose = () => {
+      sock.onclose = (ev) => {
         clearTimeout(wakeTimer); clearInterval(pinger); setConn('closed');
+        // 4000 = this player connected from another tab/window. Don't reconnect, or the two tabs
+        // would keep kicking each other off.
+        if (ev.code === 4000) { setReplaced(true); return; }
         if (!closed) timer = setTimeout(connect, 2000);
       };
       sock.onerror = () => sock.close();
@@ -283,8 +289,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     conn, waking, state, profile, setProfile, send, createGame, joinGame, leave,
     error, clearError: () => setError(null), toasts, flash, clearFlash: () => setFlash(null),
-    geo, accuracy, ready, makeReady, kicked, clearKicked: () => setKicked(false), pendingCode, notify: toast,
-  }), [toast, conn, waking, state, profile, setProfile, send, createGame, joinGame, leave, error, toasts, flash, geo, accuracy, ready, makeReady, kicked, pendingCode]);
+    geo, accuracy, ready, makeReady, kicked, clearKicked: () => setKicked(false), pendingCode, notify: toast, replaced,
+  }), [replaced, toast, conn, waking, state, profile, setProfile, send, createGame, joinGame, leave, error, toasts, flash, geo, accuracy, ready, makeReady, kicked, pendingCode]);
 
   return <GameCtx.Provider value={value}>{children}</GameCtx.Provider>;
 }

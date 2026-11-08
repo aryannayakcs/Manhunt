@@ -95,8 +95,10 @@ test('disputed catch is cancelled; ignored catch auto-accepts', () => {
   game.handle(c.id, { type: 'catch', runnerId: r1.id });
   game.handle(r1.id, { type: 'catch_response', catchId: game.stateFor(r1.id).pendingCatch!.catchId, accept: false });
   assert.equal(r1.status, 'free');
+  assert.throws(() => game.handle(c.id, { type: 'catch', runnerId: r1.id }), /disputed/, 'cooldown after a dispute');
+  for (let i = 0; i < 10; i++) { at(c.id, 0); at(r1.id, 5); at(r2.id, 200, 180); advance(1); }
   game.handle(c.id, { type: 'catch', runnerId: r1.id });
-  advance(10);
+  for (let i = 0; i < 10; i++) { at(c.id, 0); at(r1.id, 5); at(r2.id, 200, 180); advance(1); }
   assert.equal(r1.status, 'out');
   assert.equal(game.phase, 'active', 'one runner still free');
 });
@@ -327,4 +329,40 @@ test('chasers: each runner update can disappear after a set time', () => {
   assert.equal(game.stateFor(c.id).map.runners.length, 1);
   tick(1);
   assert.equal(game.stateFor(c.id).map.runners.length, 0, 'hidden after 10 s');
+});
+
+test('bug fixes: chaser needs working GPS to catch; mid-game joiners get no awards', () => {
+  const { game, host, at, advance, roles } = setup(2, { headStart: { enabled: false, seconds: 10 } });
+  game.handle(host.id, { type: 'start_game' });
+  const { chasers: [c], runners: [r] } = roles();
+  at(r.id, 5);
+  assert.throws(() => game.handle(c.id, { type: 'catch', runnerId: r.id }), /location/, 'no GPS = no remote catches');
+  const late = game.addPlayer({ name: 'Late', color: '#123456' });
+  assert.equal(late.status, 'out');
+  for (let i = 0; i < 5; i++) { at(c.id, 0); at(r.id, 100); advance(1); }
+  game.handle(host.id, { type: 'end_game' });
+  const res = game.stateFor(host.id).results!;
+  assert.ok(!res.players.some(p => p.playerId === late.id), 'late joiner not in results');
+  assert.ok(!res.awards.some(a => a.playerId === late.id));
+});
+
+test('bug fixes: zone grace starts when the chase starts; no phone-off penalty right after a pause', () => {
+  const { game, host, at, advance, roles } = setup(2, { headStart: { enabled: true, seconds: 30 }, outOfZone: { graceSec: 15 }, locationUpdates: { mode: 'off', intervalSec: 60, showSec: 0 } });
+  game.handle(host.id, { type: 'start_game' });
+  const { chasers: [c], runners: [r] } = roles();
+  // runner outside the zone for the whole head start
+  for (let i = 0; i < 31; i++) { at(c.id, 0); at(r.id, 300); advance(1); }
+  assert.equal(game.phase, 'active');
+  assert.equal(game.stateFor(c.id).map.runners.length, 0, 'not revealed the instant the chase starts');
+  for (let i = 0; i < 15; i++) { at(c.id, 0); at(r.id, 300); advance(1); }
+  assert.equal(game.stateFor(c.id).map.runners[0]?.reason, 'out_of_zone', 'revealed after the grace period');
+  at(r.id, 10); advance(1);
+  // pause for 2 minutes with phones locked (no updates), then resume
+  game.handle(host.id, { type: 'pause' });
+  advance(120);
+  game.handle(host.id, { type: 'resume' });
+  at(c.id, 0); advance(1);
+  assert.equal(game.stateFor(c.id).map.runners.length, 0, 'no instant phone-off reveal after resuming');
+  for (let i = 0; i < 31; i++) { at(c.id, 0); advance(1); }
+  assert.equal(game.stateFor(c.id).map.runners[0]?.reason, 'signal_lost', 'still applies if the phone stays dark');
 });

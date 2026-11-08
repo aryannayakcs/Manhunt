@@ -14,6 +14,7 @@
  *   --fast                         short test settings (20 s head start, 3 min game, 15 s updates)
  *   --mode out|infection|jail      what happens when caught
  *   --stats                        measure lag: update rate, longest gap, round-trip time, message size
+ *   --settings '{"catching":{"auto":true}}'   extra settings (JSON) applied when creating
  */
 import { WebSocket } from 'ws';
 import { offsetPoint, distanceM, bearingDeg } from '../src/geo.ts';
@@ -30,6 +31,7 @@ const START = flag('start');
 const FAST = flag('fast');
 const MODE = opt('mode', 'out');
 const STATS = flag('stats');
+const EXTRA = JSON.parse(opt('settings', '{}')!) as Record<string, unknown>;
 /** Lag measurements across all bots (only during the chase). */
 const stats = { states: 0, bytes: 0, maxGapMs: 0, gaps: [] as number[], rtts: [] as number[] };
 const CENTER = { lat: Number(opt('lat', '40.7829')), lng: Number(opt('lng', '-73.9654')) };
@@ -142,6 +144,7 @@ if (CREATE) {
         finalCountdown: { enabled: true, lastMin: 1, intervalSec: 5 },
         catching: { radiusM: 25, autoAcceptSec: 5 },
       } : {}),
+      ...EXTRA,
     },
   });
   if (START) setTimeout(() => host.send({ type: 'start_game' }), 1000);

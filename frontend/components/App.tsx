@@ -127,7 +127,7 @@ export function Kicked({ onClose }: { onClose: () => void }) {
 }
 
 export function Overlays({ s }: { s: GameState | null }) {
-  const { toasts, flash, conn, geo, accuracy, clearFlash } = useGame();
+  const { toasts, flash, conn, geo, accuracy, clearFlash, replaced } = useGame();
   const dismiss = useCallback(() => clearFlash(), [clearFlash]);
   const playing = !!s && s.phase !== 'lobby' && s.phase !== 'ended';
   return (
@@ -139,8 +139,15 @@ export function Overlays({ s }: { s: GameState | null }) {
         </div>
       )}
       {flash?.kind === 'revealed' && <div className="sysbar" style={{ top: 70, bottom: 'auto', zIndex: 65 }}><div className="banner danger" style={{ justifyContent: 'center' }}>📡 {flash.text}</div></div>}
+      {replaced && (
+        <div className="take dark" style={{ zIndex: 80 }}>
+          <div className="big" style={{ fontSize: 44 }}>Open somewhere else</div>
+          <p className="mut">You opened this game in another tab or window, so this one stopped. Use only one at a time.</p>
+          <button className="btn runner" onClick={() => location.reload()}>Use this tab instead</button>
+        </div>
+      )}
       <div className="sysbar">
-        {conn !== 'open' && s && <div className="banner warn">📶 Reconnecting…</div>}
+        {conn !== 'open' && s && !replaced && <div className="banner warn">📶 Reconnecting…</div>}
         {playing && geo === 'weak' && <div className="banner warn">GPS weak{accuracy ? ` (±${Math.round(accuracy)} m)` : ''}</div>}
       </div>
     </>

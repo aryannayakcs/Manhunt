@@ -4,7 +4,7 @@ import { Game, GameError } from './game.ts';
 import { ClientMessageSchema, type ServerMessage } from './protocol.ts';
 
 const PORT = Number(process.env.PORT ?? 8080);
-const VERSION = '2026-11-07f'; // bump when deploying, so /health shows which code is live
+const VERSION = '2026-11-07g'; // bump when deploying, so /health shows which code is live
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O
 const EMPTY_GAME_TTL_MS = 30 * 60_000; // delete games with nobody connected after 30 min
 const LOCATION_MIN_GAP_MS = 500;
@@ -47,6 +47,12 @@ wss.on('connection', (ws) => {
   sessions.set(ws, s);
   ws.on('pong', () => { s.alive = true; });
 
+  /** True only if this connection's player still exists in a live game (not kicked, game not deleted). */
+  const inGame = () => {
+    if (s.playerId && s.game && games.get(s.game.code) === s.game && s.game.players.has(s.playerId)) return true;
+    s.playerId = null; s.game = null;
+    return false;
+  };
   const reply = (msg: ServerMessage) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); };
   const attach = (game: Game, playerId: string, token: string) => {
     const old = sockets.get(playerId);
@@ -71,14 +77,14 @@ wss.on('connection', (ws) => {
       switch (msg.type) {
         case 'ping': return reply({ type: 'pong' });
         case 'create_game': {
-          if (s.playerId) throw new GameError('already_in_game', 'Leave your current game first.');
+          if (inGame()) throw new GameError('already_in_game', 'Leave your current game first.');
           const game = new Game(newCode(), sendTo);
           games.set(game.code, game);
           const p = game.addPlayer(msg);
           return attach(game, p.id, p.token);
         }
         case 'join_game': {
-          if (s.playerId) throw new GameError('already_in_game', 'Leave your current game first.');
+          if (inGame()) throw new GameError('already_in_game', 'Leave your current game first.');
           const game = games.get(msg.code);
           if (!game) throw new GameError('no_game', `No game with code ${msg.code}.`);
           const p = game.addPlayer(msg);
@@ -100,7 +106,7 @@ wss.on('connection', (ws) => {
           return;
         }
         default: {
-          if (!s.game || !s.playerId) {
+          if (!inGame() || !s.game || !s.playerId) {
             if (msg.type === 'location') return; // phones send GPS before (re)joining; just ignore it
             throw new GameError('not_in_game', 'Join a game first.');
           }

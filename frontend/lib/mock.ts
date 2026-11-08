@@ -158,6 +158,6 @@ export function ctx(o: Partial<Ctx> = {}): Ctx {
     conn: 'open', waking: false, state: null, profile: ME_PROFILE, setProfile: noop, send: noop,
     createGame: noop, joinGame: noop, leave: noop, error: null, clearError: noop, toasts: [], flash: null,
     clearFlash: noop, geo: 'ok', accuracy: 6, ready: true, makeReady: async () => {},
-    kicked: false, clearKicked: noop, pendingCode: null, notify: noop, ...o,
+    kicked: false, clearKicked: noop, pendingCode: null, notify: noop, replaced: false, ...o,
   };
 }
