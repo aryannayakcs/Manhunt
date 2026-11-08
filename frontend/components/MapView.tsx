@@ -4,7 +4,7 @@ import maplibregl, { type GeoJSONSource, type Map as MLMap, type Marker } from '
 import type { LatLng } from '@/lib/protocol';
 import { circlePolygon } from '@/lib/util';
 
-export interface Mk { id: string; lat: number; lng: number; color: string; kind?: 'dot' | 'tri' | 'you'; label?: string; sub?: string; subBad?: boolean; opacity?: number; hidden?: boolean }
+export interface Mk { id: string; lat: number; lng: number; color: string; kind?: 'dot' | 'tri' | 'you' | 'label'; label?: string; sub?: string; subBad?: boolean; opacity?: number; hidden?: boolean }
 export interface Circle { id: string; lat: number; lng: number; radiusM: number; color: string; opacity?: number }
 export interface Line { id: string; color: string; coords: [number, number][] }
 export interface MapProps {
@@ -29,7 +29,8 @@ const STYLE: maplibregl.StyleSpecification = {
   sources: {
     base: {
       type: 'raster', tileSize: 256, maxzoom: 19,
-      tiles: ['a', 'b', 'c', 'd'].map((s) => `https://${s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png`),
+      // Override with NEXT_PUBLIC_TILE_URL (e.g. a MapTiler / Stadia dark style with your key).
+      tiles: process.env.NEXT_PUBLIC_TILE_URL ? [process.env.NEXT_PUBLIC_TILE_URL] : ['a', 'b', 'c', 'd'].map((s) => `https://${s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png`),
       attribution: '© OpenStreetMap © CARTO',
     },
   },
@@ -41,7 +42,7 @@ function mkEl(m: Mk): HTMLElement {
   const el = document.createElement('div');
   el.className = 'mk';
   el.style.setProperty('--c', m.color);
-  el.innerHTML = `<b data-l></b><i class="${m.kind === 'tri' ? 'tri' : m.kind === 'you' ? 'you' : ''}"></i><em data-s></em>`;
+  el.innerHTML = `<b data-l></b><i class="${m.kind === 'tri' ? 'tri' : m.kind === 'you' ? 'you' : m.kind === 'label' ? 'none' : ''}"></i><em data-s></em>`;
   return el;
 }
 

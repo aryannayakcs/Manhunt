@@ -135,3 +135,6 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 .menu-btn{position:absolute;top:calc(env(safe-area-inset-top) + 10px);right:10px;z-index:45;width:44px;height:44px;border-radius:14px;background:var(--s2);border:1px solid var(--line);font-size:20px}
 .reduce *,.reduce *::before{animation:none!important}
 @media (prefers-reduced-motion:reduce){*,*::before{animation:none!important}}
+.mk i.none{display:none}
+.top{padding-right:var(--hostpad,0)}
+.sheet{position:absolute;inset:0;z-index:35;background:#000d;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:20px 20px calc(env(safe-area-inset-bottom) + 20px)}

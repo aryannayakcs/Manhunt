@@ -9,7 +9,7 @@ import { Avatar, Code, Row, Seg, Slider, Stepper, Switch, Tag } from './ui';
 
 type View = 'main' | 'settings' | 'zone';
 
-export function Lobby({ s }: { s: GameState }) {
+export function Lobby({ s, onEditProfile }: { s: GameState; onEditProfile?: () => void }) {
   const { send, leave, ready, makeReady, geo, accuracy, error, clearError, profile } = useGame();
   const [view, setView] = useState<View>('main');
   const [qr, setQr] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export function Lobby({ s }: { s: GameState }) {
 
   return (
     <div className="scr scroll">
-      <div className="top"><span className="lbl">Join code</span>{host && <span className="pill"><small>Host</small>You</span>}</div>
+      <div className="top"><span className="lbl">Join code</span><span className="row">{host && <span className="pill"><small>Host</small>You</span>}{onEditProfile && profile && <button className="pill" aria-label="Edit character" onClick={onEditProfile}>{profile.avatar} Edit</button>}</span></div>
       <Code code={s.code} />
       <div className="row">
         <button className="btn sm ghost" style={{ minHeight: 48, fontSize: 15 }} onClick={() => navigator.clipboard?.writeText(link)}>Copy link</button>
@@ -244,6 +244,7 @@ function ZoneEditor({ s, back }: { s: GameState; back: () => void }) {
 
   const gps = () => navigator.geolocation?.getCurrentPosition((p) => { const c = { lat: p.coords.latitude, lng: p.coords.longitude }; setCenter(c); }, () => {}, { enableHighAccuracy: true, timeout: 8000 });
   useEffect(() => { if (!center && s.you.location) setCenter({ lat: s.you.location.lat, lng: s.you.location.lng }); }, [center, s.you.location]);
+  useEffect(() => { if (!st.zone.center && host) gps(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (p: LatLng) => { if (!host) return; if (mode === 'zone') setCenter(p); else setJail(p); };
   const save = () => {
