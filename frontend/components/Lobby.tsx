@@ -7,11 +7,11 @@ import { fmtTime } from '@/lib/util';
 import Map from './Map';
 import { Avatar, Code, Row, Seg, Slider, Stepper, Switch, Tag } from './ui';
 
-type View = 'main' | 'settings' | 'zone';
+export type View = 'main' | 'settings' | 'zone';
 
-export function Lobby({ s, onEditProfile }: { s: GameState; onEditProfile?: () => void }) {
+export function Lobby({ s, onEditProfile, initialView = 'main' }: { s: GameState; onEditProfile?: () => void; initialView?: View }) {
   const { send, leave, ready, makeReady, geo, accuracy, error, clearError, profile, notify } = useGame();
-  const [view, setView] = useState<View>('main');
+  const [view, setView] = useState<View>(initialView);
   const [qr, setQr] = useState<string | null>(null);
   const [showQr, setShowQr] = useState(false);
   const host = s.you.isHost;

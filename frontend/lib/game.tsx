@@ -10,7 +10,7 @@ export interface Toast { id: number; text: string; kind: 'info' | 'warn' | 'dang
 export interface Flash { id: number; kind: 'revealed' | 'jailbreak' | 'caught' | 'infected' | 'go' | 'zone_out' | 'back'; text: string }
 export type Geo = 'idle' | 'ok' | 'weak' | 'denied';
 
-interface Ctx {
+export interface Ctx {
   conn: 'connecting' | 'open' | 'closed';
   waking: boolean;
   state: GameState | null;
@@ -36,7 +36,7 @@ interface Ctx {
   notify: (text: string, kind?: Toast['kind']) => void;
 }
 
-const GameCtx = createContext<Ctx>(null as unknown as Ctx);
+export const GameCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useGame = () => useContext(GameCtx);
 
 function serverUrl(): string {

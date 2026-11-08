@@ -25,9 +25,9 @@ export function RoleReveal({ role, headStartSec, onDone }: { role: 'chaser' | 'r
 }
 
 /* ---------------- Chaser ---------------- */
-export function ChaserView({ s, headStart }: { s: GameState; headStart: boolean }) {
+export function ChaserView({ s, headStart, initialPick = false }: { s: GameState; headStart: boolean; initialPick?: boolean }) {
   const { send } = useGame();
-  const [pick, setPick] = useState(false);
+  const [pick, setPick] = useState(initialPick);
   const t = s.timers;
   const pc = s.pendingCatch && s.pendingCatch.chaserId === s.you.id ? s.pendingCatch : null;
   useEffect(() => { if (pc) setPick(false); }, [pc]);

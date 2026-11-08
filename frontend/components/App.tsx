@@ -42,7 +42,7 @@ function LobbyWithProfile({ s }: { s: GameState }) {
   return <Lobby s={s} onEditProfile={() => setEditing(true)} />;
 }
 
-function Game({ s }: { s: GameState }) {
+export function Game({ s, showReveal = true }: { s: GameState; showReveal?: boolean }) {
   const { geo, ready, makeReady } = useGame();
   const phase = s.phase === 'paused' ? s.pausedFrom ?? 'active' : s.phase;
   const headStart = phase === 'headstart';
@@ -52,11 +52,11 @@ function Game({ s }: { s: GameState }) {
 
   // Show the role reveal once per game, right after it starts.
   useEffect(() => {
-    if (seen.current === null && (phase === 'headstart' || phase === 'active')) {
+    if (showReveal && seen.current === null && (phase === 'headstart' || phase === 'active')) {
       seen.current = key;
       setReveal(true);
     }
-  }, [phase, key]);
+  }, [phase, key, showReveal]);
   useEffect(() => { if (phase === 'lobby') seen.current = null; }, [phase]);
 
   const hideReveal = useCallback(() => setReveal(false), []);
@@ -83,7 +83,7 @@ function Game({ s }: { s: GameState }) {
   );
 }
 
-function Paused({ s }: { s: GameState }) {
+export function Paused({ s }: { s: GameState }) {
   const { send } = useGame();
   return (
     <div className="take dark" style={{ zIndex: 48 }}>
@@ -94,9 +94,9 @@ function Paused({ s }: { s: GameState }) {
   );
 }
 
-function HostMenu({ s }: { s: GameState }) {
+export function HostMenu({ s, initialOpen = false }: { s: GameState; initialOpen?: boolean }) {
   const { send } = useGame();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const paused = s.phase === 'paused';
   return (
     <>
@@ -118,7 +118,7 @@ function HostMenu({ s }: { s: GameState }) {
   );
 }
 
-function Kicked({ onClose }: { onClose: () => void }) {
+export function Kicked({ onClose }: { onClose: () => void }) {
   return (
     <div className="scr"><div className="grow" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 12 }}>
       <div className="disp" style={{ fontSize: 56, color: 'var(--danger)' }}>You were kicked</div><p className="mut">The host removed you from the game.</p></div>
@@ -126,7 +126,7 @@ function Kicked({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Overlays({ s }: { s: GameState | null }) {
+export function Overlays({ s }: { s: GameState | null }) {
   const { toasts, flash, conn, geo, accuracy, clearFlash } = useGame();
   const dismiss = useCallback(() => clearFlash(), [clearFlash]);
   const playing = !!s && s.phase !== 'lobby' && s.phase !== 'ended';
